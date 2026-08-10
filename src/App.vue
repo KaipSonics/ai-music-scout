@@ -13,7 +13,7 @@ const { toasts, show } = useToast();
 const artistCount = ref(0);
 
 // PIN Security Lock for Web/PWA deployment (PIN: 1607)
-const isUnlocked = ref(isTauri());
+const isUnlocked = ref(true);
 const inputPin = ref('');
 const pinError = ref('');
 
