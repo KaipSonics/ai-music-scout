@@ -1,4 +1,4 @@
-import { createRouter, createWebHistory } from 'vue-router';
+import { createRouter, createWebHashHistory } from 'vue-router';
 import Search from '../views/Search.vue';
 import CRM from '../views/CRM.vue';
 import ArtistCard from '../views/ArtistCard.vue';
@@ -13,6 +13,6 @@ const routes = [
 ];
 
 export const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHashHistory(),
   routes,
 });
