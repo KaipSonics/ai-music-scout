@@ -58,7 +58,7 @@ async function copyDraft(o:Opportunity){
 async function go(url:string){try{await openExternal(url)}catch(e){error.value=String(e)}}
 </script>
 <template>
-<section class="page">
+<section class="page scout-page">
   <div class="page-heading"><div class="heading"><p class="eyebrow">PRODUCTION INTELLIGENCE / DISCOVERY</p><h1>Коммерческий <span class="accent">радар.</span></h1><p>Находим не просто артистов, а конкретные поводы предложить услуги ASV.</p></div>
     <div class="toolbar"><button class="button ghost" @click="toggleDemo">{{demoMode?'Закрыть демо':'◎ Демо'}}</button><button class="button primary" :disabled="loading" @click="scan">{{loading?'⌛ Сканирование…':'◉ Запустить радар'}}</button></div>
   </div>

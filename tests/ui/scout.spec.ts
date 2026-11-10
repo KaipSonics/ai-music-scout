@@ -11,6 +11,7 @@ test('demo isolation, navigation, evidence and responsive layout',async({page},t
  await page.getByRole('button',{name:'✕ Закрыть'}).click();
  expect(await page.evaluate(()=>localStorage.getItem('asv_scout_v3_records'))).toBeNull();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
+ await page.getByRole('heading',{name:'Коммерческий радар.'}).scrollIntoViewIfNeeded();
  await page.screenshot({path:`test-results/${testInfo.project.name}-demo.png`,fullPage:true});
  await page.goto('./#/crm');await expect(page.getByText('Пока нет контактов',{exact:true})).toBeVisible();
  await page.goto('./#/analytics');await expect(page.getByRole('heading',{name:'Результаты по фактам.'})).toBeVisible();
@@ -31,5 +32,7 @@ test('manual lead persists, editable outreach, CRM note and reload',async({page}
  await draft.fill('Отредактированный вручную черновик');await page.getByRole('button',{name:'Готово',exact:true}).click();
  await page.goto('./#/crm');await page.getByRole('button',{name:'Детали',exact:true}).click();
  await page.locator('.modal textarea').fill('Обсудили задачу');await page.getByRole('button',{name:'Сохранить',exact:true}).click();
+ await expect(page.getByText('Карточка сохранена',{exact:true})).toBeVisible();
+ await expect(page.getByRole('dialog')).toHaveCount(0);
  await page.reload();await page.getByRole('button',{name:'Детали',exact:true}).click();await expect(page.locator('.modal textarea')).toHaveValue('Обсудили задачу');
 });
