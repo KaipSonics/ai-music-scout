@@ -5,9 +5,13 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+concurrency:
+  group: scout-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   web:
-    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
         with:
@@ -30,11 +34,14 @@ jobs:
           name: scout-ui-results
           path: test-results/
   tauri:
-    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - run: sudo apt-get update && sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libssl-dev librsvg2-dev libayatana-appindicator3-dev patchelf
+      - name: Native Linux dependencies
+        timeout-minutes: 5
+        run: sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=20 update && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y libwebkit2gtk-4.1-dev build-essential libssl-dev librsvg2-dev libayatana-appindicator3-dev patchelf
       - run: cargo check --locked --manifest-path src-tauri/Cargo.toml
 
       - run: cargo test --locked --manifest-path src-tauri/Cargo.toml --lib scout_db::tests
