@@ -131,6 +131,8 @@ p {
 }
 
 /* Form Controls */
+input:not([type]),
+input[type="number"],
 input[type="text"], 
 input[type="password"], 
 textarea, 
