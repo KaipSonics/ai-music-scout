@@ -34,12 +34,12 @@ pub(crate) async fn api_call(method:&str,params:Vec<(&str,String)>,token:String)
 pub async fn scout_test_token(token:String)->Result<String,String>{
     let v=api_call("users.get",vec![],token).await?;
     let user=v.as_array().and_then(|xs|xs.first()).ok_or("VK users.get: пустой ответ")?;
+    if user.get("first_name").and_then(Value::as_str).is_none() || user.get("last_name").and_then(Value::as_str).is_none(){return Err("VK: некорректный профиль пользователя".into())}
     Ok(format!("{} {}",user.get("first_name").and_then(Value::as_str).unwrap_or(""),user.get("last_name").and_then(Value::as_str).unwrap_or("")))
 }
 #[tauri::command]
 pub async fn vk_search_v3(query:String,count:u32,offset:u32,token:String)->Result<Value,String>{
-    api_call("groups.search",vec![("q",query),("count",count.min(100).to_string()),("offset",offset.to_string()),
-      ("fields","description,members_count,site,activity,status,photo_200".to_owned())],token).await
+    api_call("groups.search",vec![("q",query),("count",count.min(100).to_string()),("offset",offset.to_string())],token).await
 }
 #[tauri::command]
 pub async fn vk_get_wall_v3(owner_id:i64,count:u32,token:String)->Result<Value,String>{
@@ -52,7 +52,7 @@ pub async fn vk_newsfeed_search_v3(query:String,start_time:i64,extended:u8,count
 }
 #[tauri::command]
 pub fn open_url(url:String)->Result<(),String>{
-    if !(url.starts_with("https://vk.com/")||url.starts_with("https://m.vk.com/")||url.starts_with("https://vk.ru/")||url.starts_with("https://vk.me/")) || url.chars().any(|c|c.is_control()||c==' '){
+    if !(url.starts_with("https://vk.com/")||url.starts_with("https://m.vk.com/")||url.starts_with("https://vk.ru/")||url.starts_with("https://vk.me/")||url.starts_with("https://dev.vk.com/")) || url.chars().any(|c|c.is_control()||c==' '){
         return Err("Разрешены только HTTPS-ссылки VK".into());
     }
     #[cfg(target_os="macos")]
@@ -62,4 +62,10 @@ pub fn open_url(url:String)->Result<(),String>{
     #[cfg(target_os="windows")]
     let result=std::process::Command::new("rundll32.exe").arg("url.dll,FileProtocolHandler").arg(&url).spawn();
     result.map(|_|()).map_err(|e|e.to_string())
+}
+
+#[tauri::command]
+pub async fn scout_get_owner(owner_id:i64,token:String)->Result<Value,String>{
+ if owner_id<0 { api_call("groups.getById",vec![("group_ids",(-owner_id).to_string()),("fields","description,members_count,activity,status,photo_200".into())],token).await }
+ else {api_call("users.get",vec![("user_ids",owner_id.to_string()),("fields","about,status,domain,photo_200".into())],token).await}
 }

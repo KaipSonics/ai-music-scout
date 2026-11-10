@@ -4,7 +4,7 @@ export const isTauri = () => typeof window !== 'undefined' && '__TAURI_INTERNALS
 export async function openExternal(url:string):Promise<void> {
   let parsed: URL;
   try { parsed=new URL(url); } catch {throw new Error('Некорректная ссылка');}
-  if(parsed.protocol!=='https:' || !['vk.com','m.vk.com','vk.ru','vk.me'].includes(parsed.hostname) || parsed.username || parsed.password) throw new Error('Разрешены HTTPS-ссылки VK');
+  if(parsed.protocol!=='https:' || !['vk.com','m.vk.com','vk.ru','vk.me','dev.vk.com'].includes(parsed.hostname) || parsed.username || parsed.password) throw new Error('Разрешены HTTPS-ссылки VK');
   if(isTauri()) await tauriInvoke('open_url',{url:parsed.href});
   else window.open(parsed.href,'_blank','noopener,noreferrer');
 }
@@ -16,6 +16,7 @@ function read<T>(key:string,fallback:T):T {
 export async function safeInvoke<T=any>(command:string,args:Record<string,any>={}):Promise<T> {
   if(command.startsWith('ai_')) throw new Error('AI-оценки заменены общим движком Scout 3.0. Используйте радар и публикации-источники.');
   if(command==='open_url') {await openExternal(String(args.url));return undefined as T;}
+  if(command==='db_save_history'){const history=args.history||{artist_id:args.artistId,record_type:args.recordType,content:args.content};args={...args,history,artistId:history.artist_id,recordType:history.record_type,content:history.content};}
   if(isTauri()) return tauriInvoke<T>(command,args);
   const key='asv_crm_artists';
   const list=()=>read<any[]>(key,[]);

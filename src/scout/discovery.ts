@@ -1,97 +1,70 @@
-import type {Candidate,Opportunity,VkPost} from './opportunity';
-import {candidateFromOwner,evaluateOpportunity} from './opportunity';
-import {VkApiError,authorsFromSearch,delay,getWall,searchGroups,searchPosts} from './vk';
-
+import {candidateFromOwner,classifyPost,evaluateOpportunity,type Candidate,type Opportunity,type VkPost} from './opportunity';
+import {aborted} from './network';
+import {VkApiError,authorsFromSearch,delay,getWall,getOwner,searchGroups,searchPosts} from './vk';
 export type ScanMode='both'|'hot'|'growth';
-export interface ScanOptions { token:string; mode:ScanMode; maxGroups?:number; maxQueries?:number; terms?:string[]; signal?:AbortSignal }
-export interface ScanStats { postQueries:number; groupQueries:number; checkedGroups:number; postCount:number; failures:string[]; candidates:number }
-export interface ScanReport {opportunities:Opportunity[];stats:ScanStats}
-export type Progress = (state:{done:number;total:number;stage:string})=>void;
-const DIRECT_QUERIES=[
-  'ищу звукорежиссера','нужно сведение','ищу битмейкера','ищу продюсера',
-  'кто может свести трек','нужна аранжировка','ищем звукорежиссера','нужен мастеринг'
-];
-const GROWTH_QUERIES=['независимый артист','рэп исполнитель','инди группа','поп исполнитель','рок группа','музыкальный проект'];
-const MIN_POST_TIME_DAYS=75;
-const SKIP_NAMES=/фан[ -]?клуб|fan[ -]?club|новости рэпа|биржа музыкантов|оборудовани|музыкальный магазин/i;
-function numericUnique<T extends {id:string}>(a:T[]):T[]{return [...new Map(a.map(v=>[v.id,v])).values()]}
-function strongest(first:Opportunity,second:Opportunity):Opportunity{
-  const posts=[...new Map([...(first.observedPosts||[]),...(second.observedPosts||[])].map(p=>[`${p.owner_id}_${p.id}`,p])).values()];
-  const candidate=first.candidate.screenName?first.candidate:second.candidate;
-  return evaluateOpportunity(candidate,posts,second.source);
-}
-
-/** Sequential calls + throttling to respect VK limits; partial errors are visible to operator. */
-export async function discover(options:ScanOptions, onProgress:Progress=()=>{}):Promise<ScanReport>{
-  const maxQ=Math.max(1,Math.min(12,options.maxQueries??4));
-  const maxGroups=Math.max(1,Math.min(50,options.maxGroups??15));
-  const doHot=options.mode!=='growth',doGrowth=options.mode!=='hot';
-  const stats:ScanStats={postQueries:0,groupQueries:0,checkedGroups:0,postCount:0,failures:[],candidates:0};
-  const found=new Map<string,Opportunity>();
-  const queriesHot=[...new Set([...(options.terms||[]).filter(Boolean),...DIRECT_QUERIES])].slice(0,maxQ);
-  const queriesGrowth=[...new Set(GROWTH_QUERIES)].slice(0,Math.min(maxQ,6));
-  const total=(doHot?queriesHot.length:0)+(doGrowth?queriesGrowth.length+maxGroups:0);
-  let done=0;const progress=(stage:string)=>onProgress({done,total,stage});
-  function check(){if(options.signal?.aborted)throw new Error('Сканирование отменено');}
-  function merge(o:Opportunity){found.set(o.id,found.has(o.id)?strongest(found.get(o.id)!,o):o);}
-  if(doHot){
-    for(const q of queriesHot){
-      check();progress(`Публикации: «${q}»`);
-      try{
-        const response=await searchPosts(q,options.token,Math.floor(Date.now()/1000-MIN_POST_TIME_DAYS*86400));
-        const authors=authorsFromSearch(response);
-        stats.postQueries++;
-        for(const p of response.items){
-          if(!p?.id||!p.owner_id)continue;
-          stats.postCount++;
-          // When posting on another person's wall, the byline is uncertain.
-          const owner=p.owner_id;
-          const candidate=authors.get(owner)||candidateFromOwner(owner);
-          const o=evaluateOpportunity(candidate,[p],'newsfeed');
-          merge(o);
-        }
-      }catch(e){if(e instanceof VkApiError && [5,6,29].includes(e.code))throw e;stats.failures.push(`Посты «${q}»: ${String(e)}`)}
-      done++;progress('Поиск публикаций');await delay(370);
-    }
+export interface ScanOptions{token:string;mode:ScanMode;tokenType?:'user'|'service';maxGroups?:number;maxQueries?:number;terms?:string[];growthTerms?:string[];signal?:AbortSignal}
+export interface ScanStats{postQueries:number;groupQueries:number;checkedGroups:number;postCount:number;failures:string[];candidates:number;rejected:number;unverified:number}
+export interface ScanReport{opportunities:Opportunity[];checked:Opportunity[];stats:ScanStats}
+export type Progress=(s:{done:number;total:number;stage:string})=>void;
+const HOT=['ищу звукорежиссера','нужно сведение','ищу битмейкера','нужен мастеринг','нужна аранжировка','ищу музыкального продюсера','нужен аудит трека'];
+const GROWTH=['независимый артист','рэп исполнитель','инди группа','музыкальный проект'];
+let active=false;
+/** A run has one owner. UI/transport cancellation never commits stale results. */
+export async function discover(options:ScanOptions,onProgress:Progress=()=>{}):Promise<ScanReport>{
+ if(active)throw new Error('Поиск уже выполняется');aborted(options.signal);active=true;
+ const limit=Math.max(1,Math.min(30,options.maxGroups??12)),queryCount=Math.max(1,Math.min(8,options.maxQueries??4));
+ const stats:ScanStats={postQueries:0,groupQueries:0,checkedGroups:0,postCount:0,failures:[],candidates:0,rejected:0,unverified:0};
+ const checked=new Map<string,Opportunity>(),hotPosts=new Map<number,VkPost[]>(),profiles=new Map<number,Candidate>();
+ const hot=[...new Set([...(options.terms||[]),...HOT].map(s=>s.trim()).filter(Boolean))].slice(0,queryCount);
+ const growth=[...new Set([...(options.growthTerms||[]),...GROWTH].map(s=>s.trim()).filter(Boolean))].slice(0,queryCount);
+ const total=(options.mode!=='growth'?hot.length:0)+(options.mode!=='hot'?growth.length:0)+limit*2;let done=0;
+ const progress=(stage:string)=>{aborted(options.signal);onProgress({done,total,stage});};
+ function failure(label:string,e:unknown){aborted(options.signal);if(e instanceof VkApiError&&[5,6,29].includes(e.code))throw e;stats.failures.push(label+': '+String(e));}
+ function merge(candidate:Candidate,posts:VkPost[],source:'newsfeed'|'community'){
+  const prior=checked.get(candidate.id);const all=[...new Map([...(prior?.observedPosts||[]),...posts].map(p=>[`${p.owner_id}_${p.id}`,p])).values()];
+  checked.set(candidate.id,evaluateOpportunity(candidate,all,source));
+ }
+ try{
+  if(options.mode!=='growth')for(const phrase of hot){
+   progress('Поиск коммерческих публикаций: '+phrase);
+   try{const response=await searchPosts(phrase,options.token,Math.floor(Date.now()/1000-30*86400),options.signal);aborted(options.signal);stats.postQueries++;
+    for(const [id,profile]of authorsFromSearch(response))profiles.set(id,profile);
+    for(const p of response.items){stats.postCount++;if(!p||!classifyPost(p))continue;const posts=hotPosts.get(p.owner_id)||[];posts.push(p);hotPosts.set(p.owner_id,posts);}
+   }catch(e){failure('newsfeed.search',e);}done++;await delay(400,options.signal);
   }
-  if(doGrowth){
-    const groups:Candidate[]=[];
-    for(const q of queriesGrowth){
-      check();progress(`Артисты: «${q}»`);
-      try{
-        const list=await searchGroups(q,options.token);stats.groupQueries++;
-        groups.push(...list.filter(x=>!SKIP_NAMES.test(x.name)));
-      }catch(e){if(e instanceof VkApiError && [5,6,29].includes(e.code))throw e;stats.failures.push(`Группы «${q}»: ${String(e)}`)}
-      done++;progress('Поиск артистов');await delay(370);
-    }
-    const chosen=numericUnique(groups).slice(0,maxGroups);
-    stats.candidates=chosen.length;
-    for(const candidate of chosen){
-      check();progress(`Стена: ${candidate.name}`);
-      try{
-        const posts=await getWall(candidate,options.token);
-        stats.checkedGroups++;
-        stats.postCount+=posts.length;
-        const o=evaluateOpportunity(candidate,posts,'community');
-        merge(o);
-      }catch(e){if(e instanceof VkApiError && [5,6,29].includes(e.code))throw e;stats.failures.push(`Стена ${candidate.name}: ${String(e)}`)}
-      done++;progress('Анализ стен');await delay(370);
-    }
+  const recentOwners=[...hotPosts.keys()].sort((a,b)=>Math.max(...hotPosts.get(b)!.map(p=>p.date))-Math.max(...hotPosts.get(a)!.map(p=>p.date))).slice(0,limit);
+  for(const owner of recentOwners){
+   progress('Проверка профиля и авторства: '+owner);
+   let candidate=profiles.get(owner)||candidateFromOwner(owner);
+   try{candidate=await getOwner(owner,options.token,options.signal);}catch(e){failure('Профиль '+owner,e);}await delay(400,options.signal);
+   merge(candidate,hotPosts.get(owner)!,'newsfeed');done++;
   }
-  const opportunities=[...found.values()].sort((a,b)=>(b.score??-1)-(a.score??-1));
-  done=total;progress('Готово');
-  return {opportunities,stats};
+  const wallFallback=options.mode==='hot'&&stats.postQueries===0;
+  if((options.mode!=='hot'||wallFallback)&&options.tokenType!=='service'){
+   const groups=new Map<string,Candidate>();
+   for(const phrase of growth){
+    progress('Поиск музыкальных проектов: '+phrase);
+    try{for(const c of await searchGroups(phrase,options.token,options.signal))groups.set(c.id,c);stats.groupQueries++;}catch(e){failure('groups.search',e);}
+    done++;await delay(400,options.signal);
+   }
+   for(let candidate of [...groups.values()].slice(0,limit)){
+    try{candidate=await getOwner(candidate.ownerId,options.token,options.signal);}catch(e){failure('Профиль '+candidate.name,e);}await delay(400,options.signal);
+    progress('Проверка публикаций и коммерческих сигналов: '+candidate.name);
+    try{const posts=await getWall(candidate,options.token,options.signal);aborted(options.signal);stats.checkedGroups++;stats.postCount+=posts.length;merge(candidate,posts,'community');}
+    catch(e){failure('wall.get '+candidate.name,e);}done++;await delay(400,options.signal);
+   }
+  }
+  if(options.tokenType==='service'&&options.mode!=='hot')stats.failures.push('Growth: groups.search требует пользовательский токен; сервисный токен применяется только к поиску публикаций.');
+  aborted(options.signal);const all=[...checked.values()];stats.candidates=all.length;stats.rejected=all.filter(o=>o.kind==='rejected').length;stats.unverified=all.filter(o=>o.kind==='watch').length;
+  onProgress({done:total,total,stage:'Результаты готовы'});
+  return {checked:all,opportunities:all.filter(o=>(options.mode!=='hot'||o.kind==='hot')&&['hot','growth'].includes(o.kind)&&o.score!==null&&o.confidence==='source_only').sort((a,b)=>Number(b.kind==='hot')-Number(a.kind==='hot')||(b.score??0)-(a.score??0)),stats};
+ }finally{active=false;}
 }
-
-/** Human-input discovery: lets a producer test an original VK post without API access. */
-export function inspectManualPost(url:string,text:string,candidateName:string,publicationDate:string):Opportunity {
-  const match=/^https:\/\/(?:m\.)?vk\.com\/wall(-?\d+)_(\d+)(?:\?.*)?$/.exec(url.trim());
-  if(!match)throw new Error('Нужна ссылка формата https://vk.com/wall-123_456');
-  const ownerId=Number(match[1]),id=Number(match[2]);
-  if(!Number.isSafeInteger(ownerId)||ownerId===0||!Number.isSafeInteger(id)||id<=0)throw new Error('Некорректный VK ID');
-  const dateMs=Date.parse(publicationDate);
-  if(!Number.isFinite(dateMs))throw new Error('Укажите корректную дату публикации');
-  const p:VkPost={id,owner_id:ownerId,from_id:ownerId,date:Math.floor(dateMs/1000),text};
-  const candidate={...candidateFromOwner(ownerId),name:candidateName.trim()||candidateFromOwner(ownerId).name};
-  return evaluateOpportunity(candidate,[p],'manual');
+export function inspectManualPost(url:string,text:string,candidateName:string,publicationDate:string):Opportunity{
+ const match=/^https:\/\/(?:m\.)?vk\.com\/wall(-?\d+)_(\d+)(?:\?.*)?$/.exec(url.trim());
+ if(!match)throw new Error('Нужна ссылка https://vk.com/wall-123_456');
+ const owner=Number(match[1]),id=Number(match[2]),date=Date.parse(publicationDate);
+ if(!Number.isSafeInteger(owner)||!owner||!Number.isSafeInteger(id)||id<=0||!Number.isFinite(date))throw new Error('Некорректный ID или дата');
+ const candidate={...candidateFromOwner(owner),name:candidateName.trim()||candidateFromOwner(owner).name};
+ return evaluateOpportunity(candidate,[{id,owner_id:owner,from_id:owner,date:date/1000,text}],'manual');
 }

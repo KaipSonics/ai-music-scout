@@ -41,6 +41,7 @@ pub fn run() {
             scout_vk::vk_get_wall_v3,
             scout_vk::vk_newsfeed_search_v3,
             scout_vk::scout_test_token,
+            scout_vk::scout_get_owner,
             scout_db::scout_get_records,
             scout_db::scout_save_records,
             // DB - Artists

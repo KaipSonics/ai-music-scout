@@ -4,6 +4,7 @@ const KEY='asv_scout_v3_records';
 const MAX_RECORDS=2500;
 export interface ActivityEvent { at:string; type:'status'|'note'|'scan'|'followup'|'conversion'; text:string }
 export interface LeadRecord {
+ profile?:{name?:string;description?:string;contacts?:string;music_links?:string};
  id:string; opportunity:Opportunity; status:LeadStatus; note:string; firstSeen:string; lastSeen:string;
  contactedAt?:string; repliedAt?:string; negotiatingAt?:string; followUpAt?:string; wonAt?:string; valueRub?:number; history:ActivityEvent[];
 }
@@ -13,7 +14,7 @@ function validateRecord(r:unknown):r is LeadRecord {
  return typeof v.id==='string' && /^(group|user):[1-9]\d*$/.test(v.id) && v.id===o?.id && c?.id===v.id &&
    typeof c.name==='string' && Number.isSafeInteger(c.ownerId) && c.ownerId!==0 && candidateFromOwner(c.ownerId).id===v.id &&
    typeof c.profileUrl==='string' && /^https:\/\/(?:m\.)?vk\.(?:com|ru)\//.test(c.profileUrl) &&
-   typeof v.note==='string' && typeof v.firstSeen==='string' && typeof v.lastSeen==='string' &&
+   (v.profile===undefined || Object.values(v.profile).every(x=>typeof x==='string')) && typeof v.note==='string' && typeof v.firstSeen==='string' && typeof v.lastSeen==='string' &&
    Object.hasOwn(STATUS_LABEL,v.status) && Array.isArray(v.history) && v.history.every(e=>typeof e?.at==='string'&&typeof e.text==='string') &&
    ['hot','growth','watch','rejected'].includes(o.kind) && ['community','newsfeed','manual'].includes(o.source) &&
    Array.isArray(o.signals) && o.signals.every(s=>typeof s?.id==='string'&&typeof s.quote==='string'&&/^https:\/\/vk.com\/wall-?\d+_\d+$/.test(s.url)&&Number.isFinite(Date.parse(s.publishedAt))) &&
@@ -86,7 +87,7 @@ export function importRecords(json:string):Promise<{records:LeadRecord[];importe
 });}
 export function importLegacyWeb():Promise<number> {return mutate(async()=>{
  const old=await safeInvoke<any[]>('db_get_artists'),existing=await readRecords(),byId=new Map(existing.map(r=>[r.id,r]));let count=0;
- const statuses:Record<string,LeadStatus>={'Новый':'new','Изучен':'reviewed','Написали':'contacted','Ответил':'replied','Клиент':'won','Не актуален':'lost','Избранное':'reviewed','new':'new'};
+ const statuses:Record<string,LeadStatus>={'Новый':'new','Изучен':'reviewed','Написали':'contacted','Ответил':'replied','Клиент':'won','Не актуален':'lost','Избранное':'favorite','new':'new'};
  for(const a of old){
    // Legacy vk_id is positive for both users and groups. Use the saved URL/raw type, never guess.
    const link=String(a.link||''),raw=String(a.raw_data||'');
@@ -108,3 +109,12 @@ export function summarize(records:LeadRecord[]){
  const replies=records.filter(r=>!!r.repliedAt||['replied','negotiating','won'].includes(r.status)).length;
  return {total:records.length,hot:records.filter(r=>r.opportunity.kind==='hot'&&r.opportunity.confidence==='source_only').length,growth:records.filter(r=>r.opportunity.kind==='growth'&&r.opportunity.confidence==='source_only').length,contacted,replies,negotiating:records.filter(r=>r.negotiatingAt||r.status==='negotiating').length,wins:wins.length,revenue:wins.reduce((s,r)=>s+(r.valueRub||0),0)};
 }
+
+export function updateProfile(id:string,changes:{name?:string;description?:string;contacts?:string;music_links?:string}):Promise<void>{return mutate(async()=>{
+ const rows=await readRecords(),row=rows.find(r=>r.id===id);if(!row)throw new Error('Лид не найден');
+ if(changes.name!==undefined){if(!changes.name.trim())throw new Error('Укажите имя артиста');changes.name=changes.name.trim().slice(0,200);}
+ if(changes.description!==undefined)changes.description=changes.description.slice(0,10000);
+ row.profile={...row.profile,...changes};row.history.push({at:new Date().toISOString(),type:'note',text:'Обновлена карточка артиста'});await saveAll(rows);
+});}
+export function addRecordEvent(id:string,text:string):Promise<void>{return mutate(async()=>{const rows=await readRecords(),row=rows.find(r=>r.id===id);if(!row)throw new Error('Лид не найден');row.history.push({at:new Date().toISOString(),type:'note',text:text.slice(0,10000)});await saveAll(rows);});}
+export function reconcileScan(found:Opportunity[]):Promise<void>{return mutate(async()=>{const rows=await readRecords();const checked=new Map(found.map(o=>[o.id,o]));for(const r of rows){const o=checked.get(r.id);if(o){r.opportunity=o;r.lastSeen=new Date().toISOString();}}await saveAll(rows);});}

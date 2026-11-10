@@ -60,15 +60,15 @@ test('AI errors, timeouts and malformed JSON never yield invented score',async()
 test('VK invalid token, rate limit, network, malformed JSON and empty results',async()=>{
  const original=globalThis.fetch;try{
   for(const [code,match] of [[5,/токен/],[6,/Лимит/],[15,/доступ/]]){globalThis.fetch=async()=>new Response(JSON.stringify({error:{error_code:code,error_msg:'secret-value'}}));await assert.rejects(vk.searchPosts('test','test-placeholder',0),match);}
-  globalThis.fetch=async()=>{throw new Error('secret-value')};await assert.rejects(vk.searchPosts('test','test-placeholder',0),e=>!e.message.includes('secret-value')&&/сети/.test(e.message));
+  globalThis.fetch=async()=>{throw new Error('secret-value')};await assert.rejects(vk.searchPosts('test','test-placeholder',0),e=>!e.message.includes('secret-value')&&/сет/.test(e.message));
   globalThis.fetch=async()=>new Response('{invalid');await assert.rejects(vk.searchPosts('test','test-placeholder',0),/JSON/);
   globalThis.fetch=async()=>new Response(JSON.stringify({response:{items:[]}}));assert.equal((await vk.searchPosts('test','test-placeholder',0)).items.length,0);
   globalThis.fetch=async()=>new Response(JSON.stringify({response:{items:'bad'}}));await assert.rejects(vk.searchPosts('test','test-placeholder',0),/некорректный/);
  }finally{globalThis.fetch=original;}
 });
 test('VK uses bounded deterministic queries with token only in POST body',async()=>{
- const original=fetch;let calls=0;globalThis.fetch=async(url,init)=>{calls++;assert(!url.includes('access_token'));assert.equal(init.method,'POST');assert.equal(init.body.get('access_token'),'test-placeholder');return new Response(JSON.stringify({response:{items:[p()],groups:[{id:42,name:'Artist'}]}}));};
- try{const report=await discover({token:'test-placeholder',mode:'hot',maxQueries:1});assert.equal(calls,1);assert.equal(report.opportunities.length,1);}finally{globalThis.fetch=original;}
+ const original=fetch;let calls=0;globalThis.fetch=async(url,init)=>{calls++;assert(!url.includes('access_token'));assert.equal(init.method,'POST');assert.equal(init.body.get('access_token'),'test-placeholder');return new Response(JSON.stringify({response:url.endsWith('groups.getById')?[{id:42,name:'Artist',description:'Независимый музыкант'}]:{items:[p()],groups:[{id:42,name:'Artist',description:'Независимый музыкант'}]}}));};
+ try{const report=await discover({token:'test-placeholder',mode:'hot',maxQueries:1});assert.equal(calls,2);assert.equal(report.opportunities.length,1);}finally{globalThis.fetch=original;}
 });
 test('desktop VK adapter preserves signed owner ID and explicit rate-limit failure',async()=>{
  const old=globalThis.window;globalThis.window={__TAURI_INTERNALS__:{invoke:async(command,args)=>{assert.equal(command,'vk_get_wall_v3');assert.equal(args.ownerId,-42);return {items:[p()]};}}};

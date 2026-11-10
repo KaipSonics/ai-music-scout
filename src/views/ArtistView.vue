@@ -3,15 +3,16 @@ import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useSettingsStore } from '../stores/settings';
 import { useToast } from '../composables/useToast';
-import { safeInvoke } from '../utils/tauriBridge';
-import { 
-  ArrowLeft, 
-  Save, 
-  ExternalLink, 
-  Copy, 
-  Trash2, 
-  MessageCircle, 
-  Users, 
+import {crmInvoke as safeInvoke} from '../scout/crm';
+import {draftOutreach,SERVICE_LABEL} from '../scout/opportunity';
+import {
+  ArrowLeft,
+  Save,
+  ExternalLink,
+  Copy,
+  Trash2,
+  MessageCircle,
+  Users,
   FileText,
   Send
 } from '@lucide/vue';
@@ -30,7 +31,8 @@ const artistId = route.params.id as string;
 const artist = ref<ArtistRecord | null>(null);
 const history = ref<HistoryRecord[]>([]);
 const newNote = ref('');
-const activeOfferTab = ref<'mixing' | 'arrangement' | 'mastering'>('mixing');
+const activeOfferTab = ref<'mixing' | 'arrangement' | 'mastering' | 'production' | 'audit'>('mixing');
+const saving=ref(false),loadError=ref('');
 const customOfferText = ref('');
 
 const statuses: { id: CRMStatus; name: string }[] = [
@@ -39,6 +41,8 @@ const statuses: { id: CRMStatus; name: string }[] = [
   { id: 'Написали', name: 'Написали' },
   { id: 'Ответил', name: 'Ответил' },
   { id: 'Клиент', name: 'Клиент' },
+  {id:'Переговоры',name:'Переговоры'},
+  {id:'Отложен',name:'Отложен'},
   { id: 'Избранное', name: 'Избранное ⭐' },
   { id: 'Не актуален', name: 'Не актуален' },
 ];
@@ -47,10 +51,10 @@ const loadData = async () => {
   try {
     const artistsList: ArtistRecord[] = await safeInvoke('db_get_artists');
     const found = artistsList.find(a => a.id === artistId);
-    
+
     if (found) {
       artist.value = found;
-      
+
       // Auto-update status from 'Новый' to 'Изучен' on first view
       if (artist.value.status === 'Новый') {
         artist.value.status = 'Изучен';
@@ -60,12 +64,12 @@ const loadData = async () => {
 
       // Load history
       history.value = await safeInvoke('db_get_history', { artistId }) || [];
-      
+
       // Set initial offer text
-      updateOfferPreview();
-    }
+      if(artist.value.opportunity){customOfferText.value=draftOutreach(artist.value.opportunity);}else updateOfferPreview();
+    }else loadError.value='Карточка не найдена. Вернитесь в CRM.';
   } catch (e: any) {
-    toast.show(`Ошибка загрузки: ${e}`, 'error');
+    loadError.value=String(e);toast.show(`Ошибка загрузки: ${e}`, 'error');
   }
 };
 
@@ -83,6 +87,8 @@ const updateOfferPreview = () => {
     rawTemplate = store.offerMixingTemplate;
   } else if (activeOfferTab.value === 'arrangement') {
     rawTemplate = store.offerArrangementTemplate;
+  } else if(activeOfferTab.value==='production'){rawTemplate=store.offerProductionTemplate;
+  }else if(activeOfferTab.value==='audit'){rawTemplate=store.offerAuditTemplate;
   } else {
     rawTemplate = store.offerMasteringTemplate;
   }
@@ -92,19 +98,19 @@ const updateOfferPreview = () => {
     .replace(/{genre}/g, genre);
 };
 
-const setOfferTab = (tab: 'mixing' | 'arrangement' | 'mastering') => {
+const setOfferTab = (tab: 'mixing' | 'arrangement' | 'mastering' | 'production' | 'audit') => {
   activeOfferTab.value = tab;
   updateOfferPreview();
 };
 
 const saveArtist = async () => {
-  if (!artist.value) return;
+  if (!artist.value || saving.value) return;saving.value=true;
   try {
     await safeInvoke('db_save_artist', { artist: artist.value });
     toast.show('Данные сохранены', 'success');
   } catch (e: any) {
     toast.show(`Ошибка сохранения: ${e}`, 'error');
-  }
+  }finally{saving.value=false;}
 };
 
 const deleteArtist = async () => {
@@ -114,7 +120,7 @@ const deleteArtist = async () => {
   try {
     await safeInvoke('db_delete_artist', { id: artistId });
     toast.show('Артист удален из CRM', 'success');
-    router.push('/legacy-crm');
+    router.push('/crm');
   } catch (e: any) {
     toast.show(`Ошибка удаления: ${e}`, 'error');
   }
@@ -171,11 +177,12 @@ const contactsListParsed = computed(() => {
 });
 
 const goBack = () => {
-  router.push('/legacy-crm');
+  router.push('/crm');
 };
 </script>
 
 <template>
+  <div v-if="loadError" role="alert" class="glass-card">{{loadError}} <router-link to="/crm">В CRM</router-link></div>
   <div v-if="artist" class="artist-page">
     <!-- Top Action Bar -->
     <div class="top-nav flex justify-between items-center mb-6">
@@ -203,9 +210,9 @@ const goBack = () => {
           <option v-for="s in statuses" :key="s.id" :value="s.id">{{ s.name }}</option>
         </select>
 
-        <button class="btn btn-primary" @click="saveArtist">
+        <button class="btn btn-primary" :disabled="saving" @click="saveArtist">
           <Save :size="18" />
-          <span>СОХРАНИТЬ</span>
+          <span>{{saving?'СОХРАНЕНИЕ…':'СОХРАНИТЬ'}}</span>
         </button>
 
         <button class="btn btn-danger" @click="deleteArtist" title="Удалить карточку">
@@ -214,6 +221,7 @@ const goBack = () => {
       </div>
     </div>
 
+    <div class="glass-card mb-4" v-if="artist.opportunity"><h2>Коммерческий повод · {{artist.opportunity.kind.toUpperCase()}}</h2><p class="text-sm">{{artist.opportunity.service?SERVICE_LABEL[artist.opportunity.service]:'Потребность в конкретной услуге не подтверждена'}} · Opportunity: {{artist.opportunity.score??'Не проверено'}}</p><details><summary>Источники и причины оценки</summary><p class="text-xs">{{artist.opportunity.reasons.join(' · ')}}</p><div v-for="signal in artist.opportunity.signals" :key="signal.id" class="mb-3 text-xs"><strong>{{new Date(signal.publishedAt).toLocaleDateString('ru-RU')}}</strong><p>{{signal.quote}}</p><button class="btn btn-secondary btn-sm" @click="openExternal(signal.url)">Открыть источник</button></div></details></div>
     <!-- MAIN TWO COLUMN GRID -->
     <div class="artist-grid">
       <!-- LEFT COLUMN: Profile Info & Offer Copier -->
@@ -236,35 +244,34 @@ const goBack = () => {
           <div class="offer-copier-container p-3 rounded-lg border border-purple-500/20 bg-purple-950/20">
             <div class="flex justify-between items-center mb-2">
               <div class="flex gap-2">
-                <button 
+                <button
                   class="btn btn-xs"
                   :class="activeOfferTab === 'mixing' ? 'btn-purple' : 'btn-secondary'"
                   @click="setOfferTab('mixing')"
                 >
                   Сведение
                 </button>
-                <button 
+                <button
                   class="btn btn-xs"
                   :class="activeOfferTab === 'arrangement' ? 'btn-purple' : 'btn-secondary'"
                   @click="setOfferTab('arrangement')"
                 >
                   Аранжировки
                 </button>
-                <button 
+                <button
                   class="btn btn-xs"
                   :class="activeOfferTab === 'mastering' ? 'btn-purple' : 'btn-secondary'"
                   @click="setOfferTab('mastering')"
                 >
-                  Мастеринг
+                  Stem-мастеринг
                 </button>
+                <button class="btn btn-xs" :class="activeOfferTab==='production'?'btn-purple':'btn-secondary'" @click="setOfferTab('production')">Продакшн</button><button class="btn btn-xs" :class="activeOfferTab==='audit'?'btn-purple':'btn-secondary'" @click="setOfferTab('audit')">Аудит</button>
               </div>
-
-
             </div>
 
-            <textarea 
-              v-model="customOfferText" 
-              rows="4" 
+            <textarea
+              aria-label="Текст обращения" v-model="customOfferText"
+              rows="4"
               class="w-full text-xs p-3 glass-input mb-3"
             ></textarea>
 
@@ -275,6 +282,7 @@ const goBack = () => {
           </div>
         </div>
 
+        <div class="glass-card"><h2>Следующий шаг и результат</h2><label class="text-xs">Напоминание<input v-model="artist.follow_up" type="date" aria-label="Напоминание" /></label><label class="text-xs">Сумма оплаченного заказа, ₽<input v-model.number="artist.value_rub" type="number" min="0" aria-label="Сумма заказа" /></label><p class="text-xs text-muted">Оплаченный заказ учитывается при статусе «Клиент». Контакт и ответ отмечайте после фактического общения.</p></div>
         <!-- Profile Info Card -->
         <div class="glass-card">
           <h2 class="mb-3 flex items-center gap-2">
@@ -337,10 +345,10 @@ const goBack = () => {
 
         <!-- Add Note Box -->
         <div class="add-note-box pt-3 border-t border-slate-800">
-          <textarea 
-            v-model="newNote" 
-            placeholder="О чем договорились? Отправили демо? Вопросы по прайсу?.." 
-            rows="3" 
+          <textarea
+            v-model="newNote"
+            placeholder="О чем договорились? Отправили демо? Вопросы по прайсу?.."
+            rows="3"
             class="text-xs glass-input w-full mb-2"
           ></textarea>
           <button class="btn btn-purple btn-sm w-full flex items-center justify-center gap-2" @click="addHistoryRecord">
@@ -416,4 +424,5 @@ const goBack = () => {
   display: grid;
   grid-template-columns: 1fr 1fr;
 }
+@media(max-width:768px){.top-nav,.top-nav>.flex,.offer-copier-container>.flex,.offer-copier-container .flex{flex-wrap:wrap;gap:10px}.header-name{overflow-wrap:anywhere}.artist-page{min-width:0}}
 </style>

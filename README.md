@@ -1,51 +1,58 @@
 # ASV Scout 3.0
 
-Internal opportunity radar for ASV Production. Finds explicit studio-service requests (Hot) and active music projects (Growth), shows source evidence and transparent scores, and tracks manual outreach in a local CRM.
+Оригинальный интерфейс Scout 2.0: Поиск → карточки артистов → Воронка CRM → контакт → результат. Новый общий движок проверяет коммерческие Hot-сигналы и Growth-активность. Результаты поиска **не добавляются в CRM автоматически**.
 
-## Run in a browser
+## Запуск интерфейса
 
-Node.js 24 LTS and npm are required. Python 3 is used by SQLite tests.
+Node.js 24 LTS, npm. Python 3 используется тестами SQLite.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Open the URL printed by Vite (default `http://localhost:5173/ai-music-scout/`). Use **Demo** to inspect four explicitly fictional leads with no token and no CRM writes. Settings → enter your own authorized VK token → check token → choose Hot/Growth → run radar. Manual post entry is available without API access and always stays unverified/unscored.
+Откройте `http://127.0.0.1:5173/ai-music-scout/`. В разделе «Поиск» есть изолированное демо. В настройках укажите собственный разрешённый VK-токен, тип токена и параметры поиска. Токен и ключ API-сервера живут только в памяти до перезагрузки.
 
-VK methods depend on your application's permissions, token type, platform rules and availability. The app shows errors rather than turning them into empty success or demo results. A passed token check only verifies `users.get`. Browser CORS can block VK even with a valid token; Tauri uses a native HTTPS transport. Live VK access has not been verified without an authorized token.
+Пользовательский токен используется для Hot + Growth. Сервисный — для Hot через newsfeed.search; groups.search по официальной схеме требует пользовательский токен. Проверка токена не означает, что все методы разрешены приложению. Живые права и доступность показываются по фактическим ответам VK; без авторизованного токена интеграция не сертифицирована.
 
-## Desktop: Windows, Linux, macOS
+## Надёжный веб и GitHub Pages
 
-Install a current stable Rust toolchain and [Tauri platform prerequisites](https://v2.tauri.app/start/prerequisites/), then:
+Прямые запросы браузера к VK могут блокироваться CORS. Для этого реализован отдельный защищённый Node.js API-сервер. Он не обходит права VK: лишь выполняет официальные HTTPS POST на фиксированный список методов и возвращает нормализованные ошибки.
+
+См. [SERVER.md](docs/SERVER.md): сервер можно размещать на своём HTTPS-хосте; адрес и сессионный ключ указываются в прежней панели настроек. Постоянные ключи не попадают в frontend build. GitHub Pages размещает только интерфейс и самостоятельно Node.js сервер не запускает. Production deployment и merge в этой работе не выполняются.
+
+## Desktop
+
+После установки Rust и [системных зависимостей Tauri](https://v2.tauri.app/start/prerequisites/):
 
 ```sh
-npm ci
 npm run tauri dev
-# Production packages for the current operating system:
 npm run tauri build
 ```
 
-The original application identifier and SQLite location are retained. Cross-platform bundle targets are enabled; packaging must run on the target OS with its native dependencies. No macOS-only start script is required. Development port is 5173; Vite base remains compatible with the existing GitHub Pages deployment.
+Сохранены application ID и `ai_music_scout.db`. Для desktop frontend собирается с относительными путями ресурсов; веб-сборка сохраняет GitHub Pages base `/ai-music-scout/`. Windows/macOS/Linux используют один TS-движок; Rust отвечает за транспорт и SQLite.
 
-## Workflow
+## Повседневный сценарий
 
-- Radar: evidence/source/author/date, Hot/Growth filters, handled toggle, priority/recent sort and editable personal-message drafts. Open VK and send manually.
-- CRM: statuses, notes, follow-up date, amount, retained event history, JSON import/export and CSV export.
-- Analytics: leads, contact attempts, replies, negotiations, current paid orders/revenue and observed conversions. Small samples do not predict future conversion.
-- Archive CRM: original board and artist profiles. Import old contacts into Scout without deleting their original data. Ambiguous user/group identities remain in the archive.
+Настройте Hot/Growth и жанры → «Найти клиентов» → откройте «Публикации и оценка» → проверьте исходную публикацию → «В CRM» → карточка → отредактируйте черновик → откройте VK и отправьте вручную → отметьте ответ/переговоры/заказ. Поиск можно отменить. Дубли проверяются по типу аккаунта и VK ID, а не только по названию. Возраст сохранённых сигналов пересчитывается при загрузке. Ошибка, неизвестное авторство и ручной текст не дают подтверждённый балл.
 
-ASV services: mixing + mastering 12,000 ₽; stem mastering 5,000 ₽; instrumental 15,000 ₽; full production from 35,000 ₽; audit 4,000 ₽. Only explicit service needs receive a specific recommendation. No audio-listening claims are generated.
+Оригинальная CRM-доска и список читают как старые записи, так и новые. Поддержаны заметки, история, напоминания, суммы, статусы, JSON transfer и CSV. JSON-импорт не перезаписывает существующие контакты. Пользовательские правки описания не изменяют сохранённый первоисточник оценки. Выручка учитывается только у вручную отмеченных клиентов.
 
-## Checks
+Услуги ASV: сведение + мастеринг 12 000 ₽, stem-мастеринг 5 000 ₽, инструментал 15 000 ₽, продакшн от 35 000 ₽, аудит 4 000 ₽. Балл — правило приоритизации, а не вероятность покупки. Автоматической рассылки и заявлений о прослушивании нет.
+
+## Проверки
 
 ```sh
 npm test
 npm run typecheck
 npm run build
+npm run build:desktop
+npm audit --audit-level=high
 npx playwright install --with-deps chromium
 npm run test:ui
 cargo check --locked --manifest-path src-tauri/Cargo.toml
 ```
 
-See [actual verification results](docs/VERIFICATION.md), [integration decisions](docs/INTEGRATION.md), [migration/recovery](docs/MIGRATION.md) and [credential rotation](docs/SECURITY.md). The feature PR must be reviewed before merging; no deployment to main is part of this integration.
+Для сравнительных скриншотов UI-тестам нужен базовый коммит `700cad8709b76f07414048fce1b0c869f207d4ea` в Git history. CI делает полный checkout. Локально при shallow clone выполните `git fetch origin 700cad8709b76f07414048fce1b0c869f207d4ea`. Исходный интерфейс запускается только в изолированном тестовом сервере; исторический ключ в этой копии очищается перед браузерным запуском.
+
+Результаты и ограничения — [VERIFICATION.md](docs/VERIFICATION.md). [Миграции и восстановление](docs/MIGRATION.md), [архитектура](docs/INTEGRATION.md), [безопасность](docs/SECURITY.md).

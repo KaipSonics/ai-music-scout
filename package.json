@@ -11,7 +11,8 @@
     "typecheck": "vue-tsc -b",
     "test": "node scripts/run-tests.mjs",
     "test:ui": "playwright test",
-    "build:desktop": "vue-tsc -b && vite build --base=./"
+    "build:desktop": "vue-tsc -b && vite build --base=./",
+    "start:server": "node server/start.mjs"
   },
   "dependencies": {
     "@lucide/vue": "^1.27.0",

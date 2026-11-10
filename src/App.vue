@@ -1,21 +1,19 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { Settings, Search, Users, CheckCircle2, AlertCircle, BarChart3, Archive, AlertTriangle } from '@lucide/vue';
+import { Settings, Search, Users, CheckCircle2, AlertCircle, AlertTriangle } from '@lucide/vue';
 import { useSettingsStore } from './stores/settings';
 import { useToast } from './composables/useToast';
-import { safeInvoke } from './utils/tauriBridge';
+import { crmInvoke as safeInvoke } from './scout/crm';
 
 const route = useRoute();
 const settingsStore = useSettingsStore();
-const { toasts } = useToast();
+const { toasts,show } = useToast();
 
 const artistCount = ref(0);
 
 const navItems = [
-  { name: 'Радар', path: '/radar', icon: Search },
-  { name: 'Аналитика', path: '/analytics', icon: BarChart3 },
-  { name: 'Архив CRM', path: '/legacy-crm', icon: Archive },
+  { name: 'Поиск', path: '/search', icon: Search },
   { name: 'Воронка (CRM)', path: '/crm', icon: Users },
   { name: 'Настройки', path: '/settings', icon: Settings },
 ];
@@ -32,7 +30,7 @@ const updateStats = async () => {
 };
 
 onMounted(async () => {
-  await settingsStore.loadSettings();
+  try{await settingsStore.loadSettings();}catch(e){show('Ошибка загрузки настроек: '+String(e),'error');}
   await updateStats();
 });
 
@@ -67,10 +65,10 @@ watch(() => route.path, () => {
           </span>
         </div>
         <div class="token-hint text-xs text-muted">
-          {{ settingsStore.isTokenValid === true ? 'Токен проверен: права методов зависят от VK' : 'Авторизуйтесь в Настройках' }}
+          {{ settingsStore.isTokenValid === true ? 'Токен проверен; доступ методов проверяется при поиске' : 'Авторизуйтесь в Настройках' }}
         </div>
       </div>
-      
+
       <!-- Navigation Links -->
       <nav class="sidebar-nav">
         <router-link
@@ -84,13 +82,13 @@ watch(() => route.path, () => {
             <component :is="item.icon" :size="20" />
             <span>{{ item.name }}</span>
           </div>
-          
+
           <span v-if="item.path === '/crm' && artistCount > 0" class="nav-badge">
             {{ artistCount }}
           </span>
         </router-link>
       </nav>
-      
+
       <div class="sidebar-footer">
         <div class="app-version text-xs text-muted">ASV Scout 3.0 (ASV Production)</div>
         <div class="text-xs text-muted">Direct VK API • SQLite</div>
@@ -179,7 +177,7 @@ watch(() => route.path, () => {
 .asv-dune-title {
   font-family: 'Dune Rise', sans-serif;
   font-size: 2.8rem;
-  color: #2EC4B6;
+  color: #53f6e4;
   line-height: 1;
   letter-spacing: 0.22em;
   text-indent: 0.22em;
@@ -273,7 +271,7 @@ watch(() => route.path, () => {
     right: 0;
     background: rgba(18, 14, 38, 0.95);
     backdrop-filter: blur(16px);
-    border-top: 1px solid rgba(46, 196, 182, 0.3);
+    border-top: 1px solid rgba(157, 78, 221, 0.3);
     padding: 10px 16px;
     padding-bottom: calc(10px + env(safe-area-inset-bottom));
     justify-content: space-around;

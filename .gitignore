@@ -30,3 +30,5 @@ test-results/
 *.db-wal
 *.db-shm
 .env*
+
+.original-ui/

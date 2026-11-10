@@ -2,7 +2,7 @@
 export type LeadKind = 'hot' | 'growth' | 'watch' | 'rejected';
 export type Service = 'mix_master' | 'stem_master' | 'beat' | 'production' | 'audit';
 export type SignalKind = 'direct_request' | 'release_plan' | 'active_project';
-export type LeadStatus = 'new' | 'reviewed' | 'contacted' | 'replied' | 'negotiating' | 'won' | 'lost' | 'snoozed';
+export type LeadStatus = 'new' | 'reviewed' | 'contacted' | 'replied' | 'negotiating' | 'won' | 'lost' | 'snoozed' | 'favorite';
 export type SourceType = 'group' | 'user';
 export type Confidence = 'source_only' | 'needs_review';
 
@@ -45,6 +45,7 @@ export interface Signal {
 }
 export interface ScoreFactors { need: number; timing: number; fit: number; activity: number; contact: number }
 export interface Opportunity {
+  assessment?:{music:'supported'|'unknown';need:'explicit'|'activity'|'unknown';evidence:'api_original'|'unverified'};
   id: string;
   candidate: Candidate;
   kind: LeadKind;
@@ -60,18 +61,18 @@ export interface Opportunity {
 }
 const DAY_MS = 86400000;
 const clamp = (v: number) => Math.max(0, Math.min(100, Math.round(v)));
-const NON_ARTIST = /(?:фан[ -]?клуб|fan[ -]?club|фан[ -]?страниц|музыкальн(?:ые|ая) новости|афиша концертов|магазин музыкальн|продаж[аи] оборудован|рекламное агентство|продвижение артистов|биржа музыкантов|кастинг|музыкальный паблик)/i;
+const NON_ARTIST = /(?:фан[ -]?клуб|fan[ -]?club|фан[ -]?страниц|музыкальн(?:ые|ая) новости|афиша концертов|магазин музыкальн|продаж[аи] оборудован|рекламное агентство|продвижение артистов|биржа музыкантов|кастинг|музыкальный паблик|студия\s+звукозаписи|рекламное\s+агентство|звукозапись\s+на\s+заказ|продюсерский\s+центр)/i;
 const NEGATED = /(?:не\s+ищ(?:у|ем|ут)|не\s+нуж(?:ен|на|но)|уже\s+наш(?:[её]л|ли)|поиск\s+закрыт|вопрос\s+реш[её]н|ваканси[яи]\s+закрыта|не\s*актуальн|больше\s+не\s+ищ|для\s+друга|мой\s+друг\s+ищ|друзья\s+ищут|знакомый\s+ищ|ищу\s+клиент|наши\s+услуги)/i;
 const OFFERING = /(?:предлага(?:ю|ем|ют)|оказыва(?:ю|ем|ют)\s+услуг|сведу\s+ваш|сделаем\s+ваш\s+мастеринг|ищете\s+звукорежисс[её]ра\?|прайс\s+на\s+сведени)/i;
 const DIRECT: { pattern: RegExp; service: Service; label: string }[] = [
   {pattern:/(?:ищ(?:у|ем)(?![а-яё])|нуж(?:ен|на|но)|требуется)[^.!?\n]{0,65}(?:аудит|разбор\s+(?:микса|трека)|оценк[ау]\s+сведени)/i,service:'audit',label:'Ищет аудит материала'},
   { pattern: /(?:ищ(?:у|ем)(?![а-яё])|нуж(?:ен|на|но)|требуется)[^.!?\n]{0,65}(?:stem[ -]?мастеринг|стем[ -]?мастеринг|мастеринг\s+по\s+стемам)/i, service: 'stem_master', label: 'Ищет stem-мастеринг' },
   { pattern: /(?:ищ(?:у|ем)(?![а-яё])|нуж(?:ен|на|но)|требуется|подыскива(?:ю|ем)|посоветуйте|порекомендуйте)[^.!?\n]{0,75}(?:звукорежисс[её]р|сведени[ея]|свести|миксинг|мастеринг|инженер\s+по\s+звуку)|(?:кто\s+(?:может|сможет|готов))[^.!?\n]{0,45}(?:свести|сведени|мастеринг)/i, service: 'mix_master', label: 'Ищет сведение или мастеринг' },
-  { pattern: /(?:ищ(?:у|ем)(?![а-яё])|нуж(?:ен|на|но)|требуется|посоветуйте)[^.!?\n]{0,75}(?:битмейкер|битмейкера|бит\b|минус\b|инструментал|аранжировщик|аранжировк)|(?:кто\s+(?:сделает|напишет))[^.!?\n]{0,45}(?:бит\b|минус\b|аранжировк)/i, service: 'beat', label: 'Ищет инструментал или аранжировку' },
+  { pattern: /(?:ищ(?:у|ем)(?![а-яё])|нуж(?:ен|на|но)|требуется|посоветуйте)[^.!?\n]{0,75}(?:битмейкер|битмейкера|бит(?![а-яё])|минус(?![а-яё])|инструментал|аранжировщик|аранжировк)|(?:кто\s+(?:сделает|напишет))[^.!?\n]{0,45}(?:бит(?![а-яё])|минус(?![а-яё])|аранжировк)/i, service: 'beat', label: 'Ищет инструментал или аранжировку' },
   { pattern: /(?:ищ(?:у|ем)(?![а-яё])|нуж(?:ен|на|но)|требуется)[^.!?\n]{0,75}(?:саунд[ -]?продюсер|музыкальн(?:ый|ого)\s+продюсер|продакшн)/i, service: 'production', label: 'Ищет музыкальный продакшн' },
 ];
 const RELEASE = /(?:премьера[^.!?\n]{0,60}(?:трек|сингл|альбом)|выш(?:ел|ла|ли)[^.!?\n]{0,30}(?:трек|сингл|альбом)|новый\s+(?:трек|сингл|альбом)\s+уже\s+(?:доступен|на\s+площадках))|(?:записыва(?:ю|ем|ют)|готов(?:лю|им|ят)|работа(?:ю|ем|ют)\s+над|скоро\s+выйдет|скоро\s+выходит|планиру(?:ю|ем)|готовится\s+к\s+выходу)[^.!?\n]{0,90}(?:альбом|ep\b|мини[ -]?альбом|трек|релиз|сингл|пластинк)|(?:альбом|ep\b|мини[ -]?альбом|трек|релиз|сингл)[^.!?\n]{0,65}(?:скоро|в\s+работе|на\s+подходе|в\s+процессе)/i;
-const MUSIC = /(?:музык|пев(?:ец|ица)|вокал|артист|исполнител|рэп|rap\b|hip[ -]?hop|рок\b|rock\b|indie\b|инди|поп\b|pop\b|трек|сингл|альбом|бит\b|beat\b|муз\.?\s*группа|группа\s+\w+)/i;
+const MUSIC = /(?:\bep\b|музык|пев(?:ец|ица)|вокал|артист|исполнител|рэп|rap\b|hip[ -]?hop|рок(?![а-яё])|rock\b|indie\b|инди|поп(?![а-яё])|pop\b|трек|сингл|альбом|бит(?![а-яё])|beat\b|муз\.?\s*группа|группа\s+\w+)/i;
 
 function daysSince(dateSeconds: number, now: number) { return Math.max(0, (now - dateSeconds * 1000) / DAY_MS); }
 function postUrl(p: VkPost) { return `https://vk.com/wall${p.owner_id}_${p.id}`; }
@@ -100,6 +101,7 @@ export function classifyPost(p: VkPost, now = Date.now()): Signal | null {
   if (p.date * 1000 > now + 300000) return null;
   const age = daysSince(p.date, now);
   if (age > 75) return null;
+  if(/(?:на\s+концерт|для\s+концерт|озвучить\s+мероприят|прокат\s+звука|звукорежисс[её]р[^.!?]{0,30}на\s+свадьб)/i.test(p.text))return null;
   const normalized = p.text.replace(/\s+/g, ' ').trim();
   if (NEGATED.test(normalized) || OFFERING.test(normalized)) return null;
   const hit = DIRECT.find(x => x.pattern.test(normalized));
@@ -153,10 +155,11 @@ export function evaluateOpportunity(candidate: Candidate, posts: VkPost[] | null
   const factors={need,timing,fit,activity,contact};
   const score=clamp(need*.35+timing*.25+fit*.2+activity*.1+contact*.1);
   const kind: LeadKind=direct?'hot':'growth';
+  if(!hasMusicContext)return {...base,kind:'watch',score:null,factors:null,confidence:'needs_review',service:null,signals,reasons:['Не подтверждена музыкальная релевантность проекта']};
   const reasons=[best.description,`Возраст сигнала: ${best.ageDays} дн.`, 'Автор и актуальность запроса требуют ручной проверки'];
   if(isNonArtist) reasons.push('Публикация в тематическом сообществе: необходимо установить автора');
   const reliable=source==='community'||source==='newsfeed';
-  return {...base,kind,score:reliable||source==='demo'?score:null,factors:reliable||source==='demo'?factors:null,confidence:reliable?'source_only':'needs_review',service:direct?.service||null,signals:direct?[direct,...signals.filter(s=>s.id!==direct.id).sort(byDate)]:signals.sort(byDate),reasons:[...reasons.filter(r=>!r.startsWith('Автор и')), reliable?'VK вернул оригинальную публикацию от владельца; проверьте актуальность вручную':'Текст не проверен через VK API']};
+  return {...base,assessment:{music:hasMusicContext?'supported':'unknown',need:direct?'explicit':'activity',evidence:reliable?'api_original':'unverified'},kind,score:reliable||source==='demo'?score:null,factors:reliable||source==='demo'?factors:null,confidence:reliable?'source_only':'needs_review',service:direct?.service||null,signals:direct?[direct,...signals.filter(s=>s.id!==direct.id).sort(byDate)]:signals.sort(byDate),reasons:[...reasons.filter(r=>!r.startsWith('Автор и')), reliable?'VK вернул оригинальную публикацию от владельца; проверьте актуальность вручную':'Текст не проверен через VK API']};
 }
 
 export function draftOutreach(o:Opportunity): string {
@@ -169,4 +172,4 @@ export function draftOutreach(o:Opportunity): string {
   return `Привет, ${title}! Мы ASV Production — команда музыкального продакшна. ${preface}. Работаем с ${offering}. Подскажите, это сейчас актуально? Если да, можем коротко обсудить вашу задачу и предложить подходящий формат.`;
 }
 export const SERVICE_LABEL:Record<Service,string>={mix_master:'Сведение + мастеринг · 12 000 ₽',stem_master:'Stem-мастеринг · 5 000 ₽',beat:'Инструментал · 15 000 ₽',production:'Продакшн · от 35 000 ₽',audit:'Аудит · 4 000 ₽'};
-export const STATUS_LABEL:Record<LeadStatus,string>={new:'Новый',reviewed:'Изучен',contacted:'Написали',replied:'Ответил',negotiating:'Переговоры',won:'Клиент',lost:'Неактуален',snoozed:'Отложен'};
+export const STATUS_LABEL:Record<LeadStatus,string>={new:'Новый',reviewed:'Изучен',contacted:'Написали',replied:'Ответил',negotiating:'Переговоры',won:'Клиент',lost:'Неактуален',snoozed:'Отложен',favorite:'Избранное'};
