@@ -13,8 +13,6 @@ import {
   MessageCircle, 
   Users, 
   FileText,
-  Sparkles,
-  Bot,
   Send
 } from '@lucide/vue';
 import type { ArtistRecord, CRMStatus, HistoryRecord } from '../types/artist';
@@ -34,9 +32,6 @@ const history = ref<HistoryRecord[]>([]);
 const newNote = ref('');
 const activeOfferTab = ref<'mixing' | 'arrangement' | 'mastering'>('mixing');
 const customOfferText = ref('');
-const generatingAiOffer = ref(false);
-const aiEvaluationText = ref('');
-const evaluatingAi = ref(false);
 
 const statuses: { id: CRMStatus; name: string }[] = [
   { id: 'Новый', name: 'Новый' },
@@ -102,54 +97,6 @@ const setOfferTab = (tab: 'mixing' | 'arrangement' | 'mastering') => {
   updateOfferPreview();
 };
 
-const generateAiOffer = async () => {
-  if (!artist.value) return;
-
-  generatingAiOffer.value = true;
-  try {
-    const res: any = await safeInvoke('ai_generate_team_message', {
-      artistName: artist.value.name,
-      trackOrPost: artist.value.description || 'Новый релиз',
-      baseUrl: store.aiBaseUrl || '',
-      apiKey: store.aiApiKey || '',
-      model: store.aiModel || ''
-    });
-
-    if (res && res.variant_friendly) {
-      customOfferText.value = res.variant_friendly;
-      toast.show('ИИ сформировал офер от команды ASV!', 'success');
-    }
-  } catch (e: any) {
-    toast.show(`Ошибка ИИ-генерации: ${e}`, 'error');
-  } finally {
-    generatingAiOffer.value = false;
-  }
-};
-
-const runAiEvaluate = async () => {
-  if (!artist.value) return;
-
-  evaluatingAi.value = true;
-  try {
-    const artistData = `Имя: ${artist.value.name}\nОписание/Жанр: ${artist.value.description}\nПодписчики: ${artist.value.followers}\nКонтакты: ${artist.value.contacts}`;
-    const res: string = await safeInvoke('ai_analyze', {
-      data: artistData,
-      baseUrl: store.aiBaseUrl || '',
-      apiKey: store.aiApiKey || '',
-      model: store.aiModel || ''
-    });
-
-    if (res) {
-      aiEvaluationText.value = res;
-      toast.show('ИИ завершил разбор артиста!', 'success');
-    }
-  } catch (e: any) {
-    toast.show(`Ошибка ИИ-оценки: ${e}`, 'error');
-  } finally {
-    evaluatingAi.value = false;
-  }
-};
-
 const saveArtist = async () => {
   if (!artist.value) return;
   try {
@@ -167,7 +114,7 @@ const deleteArtist = async () => {
   try {
     await safeInvoke('db_delete_artist', { id: artistId });
     toast.show('Артист удален из CRM', 'success');
-    router.push('/crm');
+    router.push('/legacy-crm');
   } catch (e: any) {
     toast.show(`Ошибка удаления: ${e}`, 'error');
   }
@@ -199,10 +146,7 @@ const copyOfferToClipboard = async () => {
     await navigator.clipboard.writeText(customOfferText.value);
     toast.show('Текст предложения скопирован!', 'success');
 
-    if (artist.value && artist.value.status === 'Изучен') {
-      artist.value.status = 'Написали';
-      await safeInvoke('db_update_status', { id: artistId, status: 'Написали' });
-    }
+
   } catch (e: any) {
     toast.show('Не удалось скопировать', 'error');
   }
@@ -227,7 +171,7 @@ const contactsListParsed = computed(() => {
 });
 
 const goBack = () => {
-  router.push('/crm');
+  router.push('/legacy-crm');
 };
 </script>
 
@@ -242,7 +186,7 @@ const goBack = () => {
         </button>
 
         <div class="flex items-center gap-3">
-          <img v-if="artist.avatar" :src="artist.avatar" class="artist-header-avatar" alt="avatar" />
+          <img v-if="artist.avatar" :src="artist.avatar" class="artist-header-avatar" alt="avatar" referrerpolicy="no-referrer" />
           <div>
             <h1 class="header-name">{{ artist.name }}</h1>
             <a href="#" @click.prevent="openExternal(artist.link)" class="text-xs text-muted flex items-center gap-1">
@@ -253,10 +197,7 @@ const goBack = () => {
       </div>
 
       <div class="flex items-center gap-3">
-        <button class="btn btn-purple btn-sm" @click="runAiEvaluate" :disabled="evaluatingAi">
-          <Bot :size="16" />
-          <span>{{ evaluatingAi ? 'Анализ...' : '🤖 ИИ-РАЗБОР АРТИСТА' }}</span>
-        </button>
+<router-link class="btn btn-secondary" to="/radar">Проверить публикации</router-link>
 
         <select v-model="artist.status" @change="saveArtist" class="status-select-v2">
           <option v-for="s in statuses" :key="s.id" :value="s.id">{{ s.name }}</option>
@@ -270,17 +211,6 @@ const goBack = () => {
         <button class="btn btn-danger" @click="deleteArtist" title="Удалить карточку">
           <Trash2 :size="18" />
         </button>
-      </div>
-    </div>
-
-    <!-- AI Evaluation Box (if generated) -->
-    <div v-if="aiEvaluationText" class="glass-card mb-4 ai-eval-box">
-      <h3 class="flex items-center gap-2 mb-2 text-primary font-bold text-sm">
-        <Sparkles :size="16" />
-        Разбор ИИ для ASV Production:
-      </h3>
-      <div class="text-xs text-secondary whitespace-pre-wrap leading-relaxed">
-        {{ aiEvaluationText }}
       </div>
     </div>
 
@@ -329,10 +259,7 @@ const goBack = () => {
                 </button>
               </div>
 
-              <button class="btn btn-xs btn-purple flex items-center gap-1" @click="generateAiOffer" :disabled="generatingAiOffer">
-                <Sparkles :size="12" />
-                <span>{{ generatingAiOffer ? 'Думает...' : '✨ ИИ-ОФФЕР' }}</span>
-              </button>
+
             </div>
 
             <textarea 
@@ -362,7 +289,7 @@ const goBack = () => {
             </div>
             <div class="stat-box">
               <div class="text-xs text-muted">Активность стены</div>
-              <div class="font-bold text-sm text-success">💬 Активный паблик</div>
+              <div class="font-bold text-sm text-success">{{artist.last_activity||'Не проверена'}}</div>
             </div>
           </div>
 

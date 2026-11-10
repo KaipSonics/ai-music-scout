@@ -1,21 +1,21 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "AI Music Scout",
-  "version": "0.1.0",
+  "productName": "ASV Scout",
+  "version": "3.0.0",
   "identifier": "com.aimusicscout.app",
   "build": {
     "frontendDist": "../dist",
-    "devUrl": "http://localhost:5173",
+    "devUrl": "http://127.0.0.1:5173/ai-music-scout/",
     "beforeDevCommand": "npm run dev",
-    "beforeBuildCommand": "npm run build"
+    "beforeBuildCommand": "npm run build:desktop"
   },
   "app": {
     "windows": [
       {
-        "title": "AI Music Scout",
+        "title": "ASV Scout 3.0",
         "width": 1280,
         "height": 800,
-        "minWidth": 1024,
+        "minWidth": 360,
         "minHeight": 680,
         "resizable": true,
         "fullscreen": false,
@@ -23,12 +23,12 @@
       }
     ],
     "security": {
-      "csp": null
+      "csp": "default-src 'self'; connect-src 'self' ipc: http://ipc.localhost https://api.vk.com; img-src 'self' data: https:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com"
     }
   },
   "bundle": {
     "active": true,
-    "targets": ["app"],
+    "targets": "all",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

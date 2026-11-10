@@ -1,0 +1,35 @@
+import {test,expect} from '@playwright/test';
+test('demo isolation, navigation, evidence and responsive layout',async({page},testInfo)=>{
+ const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('./#/radar');
+ await expect(page.getByRole('heading',{name:'Коммерческий радар.'})).toBeVisible();
+ await page.getByRole('button',{name:'◎ Демо',exact:true}).click();
+ await expect(page.getByText('ДЕМО-РЕЖИМ:',{exact:false})).toBeVisible();
+ await expect(page.locator('article.lead')).toHaveCount(4);
+ await page.getByRole('button',{name:'Открыть карточку'}).first().click();
+ await expect(page.getByRole('dialog')).toContainText('Факторы:');
+ await page.getByRole('button',{name:'✕ Закрыть'}).click();
+ expect(await page.evaluate(()=>localStorage.getItem('asv_scout_v3_records'))).toBeNull();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth)).toBeTruthy();
+ await page.screenshot({path:`test-results/${testInfo.project.name}-demo.png`,fullPage:true});
+ await page.goto('./#/crm');await expect(page.getByText('Пока нет контактов',{exact:true})).toBeVisible();
+ await page.goto('./#/analytics');await expect(page.getByRole('heading',{name:'Результаты по фактам.'})).toBeVisible();
+ await page.goto('./#/settings');await expect(page.getByPlaceholder('Вставьте токен из вашего приложения VK')).toHaveAttribute('type','password');
+ await page.getByRole('button',{name:'Проверить токен'}).click();await expect(page.getByText('Не удалось проверить VK.',{exact:false})).toBeVisible();
+ await page.goto('./#/legacy-crm');await expect(page.locator('.main-content')).toBeVisible();
+ expect(errors).toEqual([]);
+});
+test('manual lead persists, editable outreach, CRM note and reload',async({page})=>{
+ await page.goto('./#/radar');await page.getByRole('button',{name:'+ Добавить публикацию'}).click();
+ await page.getByPlaceholder('https://vk.com/wall-123_456').fill('https://vk.com/wall-42_99');
+ await page.getByPlaceholder('Название артиста').fill('Тестовый артист');
+ await page.getByPlaceholder('Скопируйте текст опубликованного поста').fill('Ищу звукорежиссера для сведения EP');
+ await page.getByRole('button',{name:'Проверить и сохранить'}).click();
+ await expect(page.locator('article.lead')).toHaveCount(1);await expect(page.locator('.lead-score strong')).toHaveText('—');
+ await page.getByRole('button',{name:'Черновик обращения'}).click();
+ const draft=page.getByRole('textbox',{name:'Текст обращения'});expect(await draft.inputValue()).toContain('wall-42_99');expect(await draft.inputValue()).not.toMatch(/послуш/);
+ await draft.fill('Отредактированный вручную черновик');await page.getByRole('button',{name:'Готово',exact:true}).click();
+ await page.goto('./#/crm');await page.getByRole('button',{name:'Детали',exact:true}).click();
+ await page.locator('.modal textarea').fill('Обсудили задачу');await page.getByRole('button',{name:'Сохранить',exact:true}).click();
+ await page.reload();await page.getByRole('button',{name:'Детали',exact:true}).click();await expect(page.locator('.modal textarea')).toHaveValue('Обсудили задачу');
+});

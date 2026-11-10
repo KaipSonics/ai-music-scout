@@ -54,5 +54,11 @@ pub fn init_db(app_handle: &AppHandle) -> Result<Connection> {
         [],
     )?;
 
+    let migrated: i64 = conn.query_row("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='scout_records'", [], |r|r.get(0))?;
+    if migrated == 0 {
+        let backup = app_dir.join("ai_music_scout.before-v3.db");
+        if !backup.exists() { conn.execute("VACUUM INTO ?1", [backup.to_string_lossy().as_ref()])?; }
+        conn.execute_batch(include_str!("../migrations/003_opportunities.sql"))?;
+    }
     Ok(conn)
 }

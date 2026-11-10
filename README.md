@@ -1,61 +1,51 @@
-# AI Music Scout v2.0 — ASV Production
+# ASV Scout 3.0
 
-> **Автономная система ИИ-скаутинга и поиска клиентов для музыкальной студии ASV Production**  
-> (Основатели: Станислав Kaip и Анастасия Василевские, экс-1703 Records)
+Internal opportunity radar for ASV Production. Finds explicit studio-service requests (Hot) and active music projects (Growth), shows source evidence and transparent scores, and tracks manual outreach in a local CRM.
 
-🌐 **Live Demo (Web PWA)**: [https://kaipsonics.github.io/ai-music-scout/](https://kaipsonics.github.io/ai-music-scout/)
+## Run in a browser
 
-AI Music Scout — это специализированное кроссплатформенное приложение (macOS Desktop + iOS PWA для iPhone), предназначенное для автоматического поиска, классификации нейросетью и ведения воронки клиентов среди малоизвестных независимых артистов и групп (100 – 50 000 подписчиков) ВКонтакте.
+Node.js 24 LTS and npm are required. Python 3 is used by SQLite tests.
 
----
+```sh
+npm ci
+npm run dev
+```
 
-## ✨ Ключевые возможности
+Open the URL printed by Vite (default `http://localhost:5173/ai-music-scout/`). Use **Demo** to inspect four explicitly fictional leads with no token and no CRM writes. Settings → enter your own authorized VK token → check token → choose Hot/Growth → run radar. Manual post entry is available without API access and always stays unverified/unscored.
 
-1. **🚀 Авто-скаутинг 30 клиенто-артистов в один клик**:
-   - Автоматический отбор кандидатов всех жанров (Pop, Rock, Vocal, Indie, EDM, Rap).
-   - Карусельная многовекторная выборка (Round-Robin Sampling) предотвращает засилье одного жанра.
-   - Динамическое случайное смещение (`offset`) гарантирует выгрузку **новых неповторяющихся артистов** при каждом клике.
+VK methods depend on your application's permissions, token type, platform rules and availability. The app shows errors rather than turning them into empty success or demo results. A passed token check only verifies `users.get`. Browser CORS can block VK even with a valid token; Tauri uses a native HTTPS transport. Live VK access has not been verified without an authorized token.
 
-2. **🧠 Встроенный Глубокий ИИ-Классификатор (Zero-Config)**:
-   - В программу зашит встроенный бесплатный ИИ-движок. Вам не нужно покупать ключи.
-   - Нейросеть вычитывает паспорт группы и посты со стены, строго отсеивая:
-     - Новостные агрегаторы (*«про РУССКИЙ РЭП»*, *«РЭП - КОСТРОМА»*);
-     - Поисковики и биржи (*«Поиск Музыкантов СПб»*);
-     - Фан-клубы (*«fan club»*, *«фан страница»*);
-     - Магазины бытовой техники и электрику;
-     - Фестивали, афиши и конкурсы.
-   - Каждое отклонение сопровождается прозрачным мнением ИИ в нижнем аккордеоне **«Отклонено ИИ»**.
+## Desktop: Windows, Linux, macOS
 
-3. **💬 Персонализированный Генератор Сообщений от Команды ASV Production**:
-   - Генерация 3 человечных вариантов оферов от лица **нашей команды (Стас Kaip и Анастасия)**:
-     - 🤝 **Искренний / Дружеский**
-     - 🎧 **Студийный / Стилистический**
-     - 🚀 **Прямой / Лаконичный**
-   - Учитывает название релиза или крайнего поста со стены.
-   - Никаких бесплатных тестов — только коммерческий аудиопродакшн.
+Install a current stable Rust toolchain and [Tauri platform prerequisites](https://v2.tauri.app/start/prerequisites/), then:
 
-4. **📱 Полная мобильная поддержка iPhone**:
-   - Адаптивный экран под вырез Dynamic Island и нижняя панель навигации (iOS Bottom Nav).
-   - Защита приложения секретным PIN-кодом.
-   - Автономный режим без привязки к компьютеру — работает 100% в браузере Safari со сохранением базы в `IndexedDB / LocalStorage`.
-   - Вход VK Admin в 1 клик со считыванием токенов из любых мобильных ссылок.
+```sh
+npm ci
+npm run tauri dev
+# Production packages for the current operating system:
+npm run tauri build
+```
 
-5. **📊 Встроенная CRM-Воронка**:
-   - Фиксация лидов по статусам: *Новый*, *Контакты*, *Переговоры*, *В работе*, *Завершено*, *Избранное*.
-   - Локальное безопасное хранение базы в SQLite / LocalStorage.
+The original application identifier and SQLite location are retained. Cross-platform bundle targets are enabled; packaging must run on the target OS with its native dependencies. No macOS-only start script is required. Development port is 5173; Vite base remains compatible with the existing GitHub Pages deployment.
 
----
+## Workflow
 
-## 🛠 Технологический стек
+- Radar: evidence/source/author/date, Hot/Growth filters, handled toggle, priority/recent sort and editable personal-message drafts. Open VK and send manually.
+- CRM: statuses, notes, follow-up date, amount, retained event history, JSON import/export and CSV export.
+- Analytics: leads, contact attempts, replies, negotiations, current paid orders/revenue and observed conversions. Small samples do not predict future conversion.
+- Archive CRM: original board and artist profiles. Import old contacts into Scout without deleting their original data. Ambiguous user/group identities remain in the archive.
 
-- **Core**: Rust (Tauri v2), TypeScript, Vue 3, Pinia, Vue Router
-- **Design System**: Modern Glassmorphic Cyberpunk UI, Vanilla CSS Tokens
-- **AI Engine**: OpenRouter Free Engine (`google/gemini-2.0-flash-exp:free` / `deepseek-r1`) + Tauri Bridge
-- **Database**: SQLite (Desktop) / LocalStorage (Mobile PWA)
-- **API**: VK API v5.131 Direct Calls
+ASV services: mixing + mastering 12,000 ₽; stem mastering 5,000 ₽; instrumental 15,000 ₽; full production from 35,000 ₽; audit 4,000 ₽. Only explicit service needs receive a specific recommendation. No audio-listening claims are generated.
 
----
+## Checks
 
-## 📄 Лицензия & Авторские права
+```sh
+npm test
+npm run typecheck
+npm run build
+npx playwright install --with-deps chromium
+npm run test:ui
+cargo check --locked --manifest-path src-tauri/Cargo.toml
+```
 
-© 2026 **ASV Production** (Станислав и Анастасия Василевские). Все права защищены.
+See [actual verification results](docs/VERIFICATION.md), [integration decisions](docs/INTEGRATION.md), [migration/recovery](docs/MIGRATION.md) and [credential rotation](docs/SECURITY.md). The feature PR must be reviewed before merging; no deployment to main is part of this integration.

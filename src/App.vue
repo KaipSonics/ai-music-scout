@@ -1,34 +1,21 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { Settings, Search, Users, CheckCircle2, AlertCircle, Lock, KeyRound, AlertTriangle } from '@lucide/vue';
+import { Settings, Search, Users, CheckCircle2, AlertCircle, BarChart3, Archive, AlertTriangle } from '@lucide/vue';
 import { useSettingsStore } from './stores/settings';
 import { useToast } from './composables/useToast';
-import { safeInvoke, isTauri } from './utils/tauriBridge';
+import { safeInvoke } from './utils/tauriBridge';
 
 const route = useRoute();
 const settingsStore = useSettingsStore();
-const { toasts, show } = useToast();
+const { toasts } = useToast();
 
 const artistCount = ref(0);
 
-// PIN Security Lock for Web/PWA deployment (PIN: 1607)
-const isUnlocked = ref(true);
-const inputPin = ref('');
-const pinError = ref('');
-
-const checkPin = () => {
-  if (inputPin.value.trim() === '1607' || inputPin.value.trim() === 'asv') {
-    localStorage.setItem('asv_pwa_unlocked', 'true');
-    isUnlocked.value = true;
-    show('Доступ разрешен!', 'success');
-  } else {
-    pinError.value = 'Неверный пин-код доступа ASV';
-  }
-};
-
 const navItems = [
-  { name: 'Поиск', path: '/search', icon: Search },
+  { name: 'Радар', path: '/radar', icon: Search },
+  { name: 'Аналитика', path: '/analytics', icon: BarChart3 },
+  { name: 'Архив CRM', path: '/legacy-crm', icon: Archive },
   { name: 'Воронка (CRM)', path: '/crm', icon: Users },
   { name: 'Настройки', path: '/settings', icon: Settings },
 ];
@@ -45,9 +32,6 @@ const updateStats = async () => {
 };
 
 onMounted(async () => {
-  if (!isTauri() && localStorage.getItem('asv_pwa_unlocked') === 'true') {
-    isUnlocked.value = true;
-  }
   await settingsStore.loadSettings();
   await updateStats();
 });
@@ -58,34 +42,7 @@ watch(() => route.path, () => {
 </script>
 
 <template>
-  <!-- SECURITY LOCK SCREEN FOR WEB / PWA -->
-  <div v-if="!isUnlocked" class="pin-lock-screen">
-    <div class="glass-card lock-box p-8 text-center max-w-sm w-full mx-4">
-      <div class="lock-icon-wrapper mx-auto mb-4">
-        <Lock :size="32" color="#53f6e4" />
-      </div>
-      <h2 class="font-bold text-xl text-primary mb-1">ASV Production</h2>
-      <p class="text-xs text-muted mb-4">Приватный скаут клиентов. Введите PIN-код доступа:</p>
-
-      <div class="space-y-3">
-        <input 
-          v-model="inputPin" 
-          type="password" 
-          placeholder="Пин-код..." 
-          class="text-center font-bold text-lg p-3 glass-input w-full rounded-lg"
-          @keyup.enter="checkPin"
-        />
-        <div v-if="pinError" class="text-xs text-red-400 font-bold">{{ pinError }}</div>
-
-        <button class="btn btn-purple w-full flex items-center justify-center gap-2" @click="checkPin">
-          <KeyRound :size="18" />
-          <span>Войти в сервис</span>
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <div v-else class="layout">
+  <div class="layout">
     <!-- Desktop Sidebar -->
     <aside class="sidebar">
       <div class="sidebar-header">
@@ -103,14 +60,14 @@ watch(() => route.path, () => {
             <CheckCircle2 :size="12" /> {{ settingsStore.tokenUserName || 'Активен' }}
           </span>
           <span v-else-if="settingsStore.isTokenValid === false" class="flex items-center gap-1 text-amber-400 font-bold">
-            <AlertTriangle :size="12" /> Истек (Обновите)
+            <AlertTriangle :size="12" /> Ошибка проверки
           </span>
           <span v-else class="flex items-center gap-1 text-danger font-bold">
             <AlertCircle :size="12" /> Не указан
           </span>
         </div>
         <div class="token-hint text-xs text-muted">
-          {{ settingsStore.isTokenValid === true ? 'Прямой режим (без WebView)' : 'Авторизуйтесь в Настройках' }}
+          {{ settingsStore.isTokenValid === true ? 'Токен проверен: права методов зависят от VK' : 'Авторизуйтесь в Настройках' }}
         </div>
       </div>
       
@@ -135,7 +92,7 @@ watch(() => route.path, () => {
       </nav>
       
       <div class="sidebar-footer">
-        <div class="app-version text-xs text-muted">AI Music Scout v2.0 (ASV Production)</div>
+        <div class="app-version text-xs text-muted">ASV Scout 3.0 (ASV Production)</div>
         <div class="text-xs text-muted">Direct VK API • SQLite</div>
       </div>
     </aside>
@@ -222,7 +179,7 @@ watch(() => route.path, () => {
 .asv-dune-title {
   font-family: 'Dune Rise', sans-serif;
   font-size: 2.8rem;
-  color: #53f6e4;
+  color: #2EC4B6;
   line-height: 1;
   letter-spacing: 0.22em;
   text-indent: 0.22em;
@@ -316,7 +273,7 @@ watch(() => route.path, () => {
     right: 0;
     background: rgba(18, 14, 38, 0.95);
     backdrop-filter: blur(16px);
-    border-top: 1px solid rgba(157, 78, 221, 0.3);
+    border-top: 1px solid rgba(46, 196, 182, 0.3);
     padding: 10px 16px;
     padding-bottom: calc(10px + env(safe-area-inset-bottom));
     justify-content: space-around;
