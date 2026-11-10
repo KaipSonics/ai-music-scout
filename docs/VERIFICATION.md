@@ -2,7 +2,7 @@
 
 ## Local execution
 
-- npm test: 16 classifier/scoring checks, 17 regression cases, 8 engine/backend/CRM cases, plus real SQLite migration/backup/idempotence/rollback validation. Backend tests exercise real localhost HTTP with mocked upstream VK.
+- npm test: 16 classifier/scoring checks, 17 regression cases, 9 engine/backend/CRM cases, plus real SQLite migration/backup/idempotence/rollback validation. Backend tests exercise real localhost HTTP with mocked upstream VK.
 - TypeScript and production builds for web and desktop frontend executed during development. CI rechecks the final revision.
 - npm audit: 0 vulnerabilities at the last local audit.
 - Local Chromium launch remains blocked by environment sockets and cargo is unavailable. Native and real Chromium checks therefore run in GitHub Actions; see the latest checks on PR #1 for final revision results.

@@ -34,7 +34,9 @@ test('MOCK VK full flow: search → evidence → CRM → manual contact → paid
  await expect.poll(async()=>page.evaluate(()=>JSON.parse(localStorage.getItem('asv_scout_v3_records')||'[]')[0]?.valueRub)).toBe(12000);
  await page.getByPlaceholder('О чем договорились? Отправили демо? Вопросы по прайсу?..').fill('Договорились об обработке EP');await page.getByRole('button',{name:'ДОБАВИТЬ ЗАПИСЬ'}).click();await expect(page.getByText('Заметка добавлена в историю',{exact:true})).toBeVisible();
  await page.reload();await expect(page.locator('.artist-page')).toContainText('Договорились об обработке EP');await expect(page.getByRole('spinbutton',{name:'Сумма заказа'})).toHaveValue('12000');await expect(page.locator('.status-select-v2')).toHaveValue('Клиент');
- await page.goto('./#/crm');await expect(page.locator('.crm-page')).toContainText('12');const download=page.waitForEvent('download');await page.getByRole('button',{name:'ЭКСПОРТ',exact:true}).click();expect((await download).suggestedFilename()).toBe('ASV-Scout-CRM.json');
+ await page.goto('./#/crm');await expect(page.locator('.crm-page')).toContainText('12');const download=page.waitForEvent('download');await page.getByRole('button',{name:'ЭКСПОРТ',exact:true}).click();const exported=await download;expect(exported.suggestedFilename()).toBe('ASV-Scout-CRM.json');const exportPath=await exported.path();expect(exportPath).toBeTruthy();
+ const csv=page.waitForEvent('download');await page.getByRole('button',{name:'CSV',exact:true}).click();expect((await csv).suggestedFilename()).toBe('ASV-Scout-CRM.csv');
+ await page.locator('.crm-page input[type=file]').setInputFiles(exportPath!);await expect(page.getByText(/Импортировано:/).last()).toBeVisible();await page.getByRole('button',{name:/Список/}).click();await expect(page.locator('.crm-page')).toContainText('Hot Artist');
  expect(await page.evaluate(()=>[...Object.entries(localStorage)].some(([k,v])=>/token|key/i.test(k)||String(v).includes('test-placeholder')))).toBeFalsy();
 });
 test('MOCK VK explicit errors, empty search, cancellation and repeat scan dedupe',async({page})=>{

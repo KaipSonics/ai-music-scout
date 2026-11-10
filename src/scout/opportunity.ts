@@ -61,9 +61,9 @@ export interface Opportunity {
 }
 const DAY_MS = 86400000;
 const clamp = (v: number) => Math.max(0, Math.min(100, Math.round(v)));
-const NON_ARTIST = /(?:фан[ -]?клуб|fan[ -]?club|фан[ -]?страниц|музыкальн(?:ые|ая) новости|афиша концертов|магазин музыкальн|продаж[аи] оборудован|рекламное агентство|продвижение артистов|биржа музыкантов|кастинг|музыкальный паблик|студия\s+звукозаписи|рекламное\s+агентство|звукозапись\s+на\s+заказ|продюсерский\s+центр)/i;
+const NON_ARTIST = /(?:фан[ -]?клуб|fan[ -]?club|фан[ -]?страниц|музыкальн(?:ые|ая) новости|афиша концертов|магазин музыкальн|продаж[аи] оборудован|рекламное агентство|продвижение артистов|биржа музыкантов|кастинг|музыкальный паблик|магазин|ремонт\s+техники|электрик|студия\s+звукозаписи|рекламное\s+агентство|звукозапись\s+на\s+заказ|продюсерский\s+центр)/i;
 const NEGATED = /(?:не\s+ищ(?:у|ем|ут)|не\s+нуж(?:ен|на|но)|уже\s+наш(?:[её]л|ли)|поиск\s+закрыт|вопрос\s+реш[её]н|ваканси[яи]\s+закрыта|не\s*актуальн|больше\s+не\s+ищ|для\s+друга|мой\s+друг\s+ищ|друзья\s+ищут|знакомый\s+ищ|ищу\s+клиент|наши\s+услуги)/i;
-const OFFERING = /(?:предлага(?:ю|ем|ют)|оказыва(?:ю|ем|ют)\s+услуг|сведу\s+ваш|сделаем\s+ваш\s+мастеринг|ищете\s+звукорежисс[её]ра\?|прайс\s+на\s+сведени)/i;
+const OFFERING = /(?:ищ(?:у|ем)\s+(?:заказчик|клиент)|беру\s+в\s+работу|набор\s+клиент|предлага(?:ю|ем|ют)|оказыва(?:ю|ем|ют)\s+услуг|сведу\s+ваш|сделаем\s+ваш\s+мастеринг|ищете\s+звукорежисс[её]ра\?|прайс\s+на\s+сведени)/i;
 const DIRECT: { pattern: RegExp; service: Service; label: string }[] = [
   {pattern:/(?:ищ(?:у|ем)(?![а-яё])|нуж(?:ен|на|но)|требуется)[^.!?\n]{0,65}(?:аудит|разбор\s+(?:микса|трека)|оценк[ау]\s+сведени)/i,service:'audit',label:'Ищет аудит материала'},
   { pattern: /(?:ищ(?:у|ем)(?![а-яё])|нуж(?:ен|на|но)|требуется)[^.!?\n]{0,65}(?:stem[ -]?мастеринг|стем[ -]?мастеринг|мастеринг\s+по\s+стемам)/i, service: 'stem_master', label: 'Ищет stem-мастеринг' },
@@ -108,12 +108,14 @@ export function classifyPost(p: VkPost, now = Date.now()): Signal | null {
   const release = !hit && RELEASE.test(normalized);
   if (!hit && !release) return null;
   if ((hit && age > 30) || (release && age > 60)) return null;
+  const matchIndex=(hit?.pattern.exec(normalized)||RELEASE.exec(normalized))?.index||0;
+  const excerptStart=Math.max(0,matchIndex-100);
   return {
     id: `wall${p.owner_id}_${p.id}`,
     kind: hit ? 'direct_request' : 'release_plan',
     service: hit?.service || null,
     description: hit?.label || 'Готовит новый материал или релиз',
-    quote: normalized.slice(0, 550),
+    quote: normalized.slice(excerptStart,excerptStart+550),
     url: postUrl(p), publishedAt: new Date(p.date*1000).toISOString(),
     ageDays: Math.floor(age),
     confidence: 'needs_review',

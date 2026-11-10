@@ -155,7 +155,7 @@ const getVkMeUrl = (link: string) => {
       </div>
     </div>
 
-    <div class="glass-card mb-4 text-sm">Контактов: {{artists.length}} · Ответили: {{artists.filter(a=>['Ответил','Переговоры','Клиент'].includes(a.status)).length}} · Заказов: {{artists.filter(a=>a.status==='Клиент').length}} · Выручка: {{revenue.toLocaleString('ru-RU')}} ₽ <span class="text-xs text-muted">(отмечено вручную)</span></div>
+    <div class="glass-card mb-4 text-sm">Контактов: {{artists.length}} · Ответили: {{artists.filter(a=>a.replied_at||['Ответил','Переговоры','Клиент'].includes(a.status)).length}} · Заказов: {{artists.filter(a=>a.status==='Клиент').length}} · Выручка: {{revenue.toLocaleString('ru-RU')}} ₽ <span class="text-xs text-muted">(отмечено вручную)</span></div>
     <div v-if="!loading&&!artists.length" class="glass-card mb-4 text-muted">CRM пока пуста. Найдите артистов в <router-link to="/search">поиске</router-link> и добавьте интересных кнопкой «В CRM».</div>
     <!-- Loading State -->
     <div v-if="loading" class="text-muted text-center py-8">

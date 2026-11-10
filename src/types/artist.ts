@@ -30,6 +30,8 @@ export interface ArtistRecord {
   raw_data: string;
   status: CRMStatus;
   notes: string;
+  contacted_at?:string;
+  replied_at?:string;
   follow_up?:string;
   value_rub?:number;
   opportunity?:import('../scout/opportunity').Opportunity;

@@ -301,6 +301,7 @@ const goBack = () => {
             </div>
           </div>
 
+          <details class="mb-3"><summary>Заметки и данные артиста</summary><label class="text-xs">Имя / проект<input v-model="artist.name" aria-label="Имя артиста" class="glass-input" /></label><label class="text-xs">Контакты<textarea v-model="artist.contacts" aria-label="Контакты" class="glass-input"></textarea></label><label class="text-xs">Музыкальные ссылки<textarea v-model="artist.music_links" aria-label="Музыкальные ссылки" class="glass-input"></textarea></label><label class="text-xs">Сохранённые заметки<textarea v-model="artist.notes" aria-label="Заметки артиста" class="glass-input"></textarea></label></details>
           <div class="mb-3">
             <label class="block text-xs font-bold text-muted mb-1">Описание / Жанр</label>
             <textarea v-model="artist.description" @change="saveArtist" rows="3" class="text-xs glass-input w-full"></textarea>

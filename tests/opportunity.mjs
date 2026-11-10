@@ -27,7 +27,7 @@ test('future posts do not count',()=>assert.equal(classifyPost(p('Ищу зву�
 test('growth activity requires musical context',()=>{
   const c=candidateFromOwner(-12,{name:'Случайный магазин'});
   const posts=[p('Скидка на шторы',2),{...p('Работаем до шести',3),id:124},{...p('Привезли коробки',4),id:125}];
-  assert.equal(evaluateOpportunity(c,posts,'community',now).score,null);
+  assert.equal(evaluateOpportunity(c,posts,'community',now).kind,'rejected');
 });
 test('recent direct request outranks a release hint',()=>{
  const direct=evaluateOpportunity(artist,[p('Ищу звукорежиссера')],'community',now);

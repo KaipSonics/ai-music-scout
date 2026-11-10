@@ -29,3 +29,8 @@ test('original CRM adapter preserves legacy data, v3 notes/deal/events, dedupe a
  await crm.crmInvoke('db_update_status',{id,status:'Клиент'});artist=await crm.crmInvoke('db_get_artist',{id});assert.equal(artist.value_rub,12000);assert.equal(artist.notes,'Поговорили');
  const exported=await crm.exportCRM();storage.clear();await crm.importCRM(exported);assert.equal((await crm.allArtists()).length,2);assert.equal((await store.loadRecords())[0].note,'Поговорили');assert.equal((await crm.crmInvoke('db_get_artist',{id:'legacy'})).notes,'Не терять');
 });
+
+test('service sellers and distant matched excerpts do not create misleading evidence',()=>{
+ assert.equal(classifyPost({...post,text:'Ищу заказчиков на сведение треков'}),null);
+ const signal=classifyPost({...post,text:'Текст вступления. '.repeat(100)+'Ищу звукорежиссера для сведения нового трека'});assert(signal.quote.includes('Ищу звукорежиссера'));assert(signal.quote.length<=550);
+});

@@ -14,9 +14,9 @@ export function identity(a:Pick<ArtistRecord,'id'|'vk_id'|'link'|'raw_data'>):st
 }
 export function asArtist(r:LeadRecord):ArtistRecord{
  const c=r.opportunity.candidate;
- return {id:r.id,vk_id:String(c.ownerId),name:r.profile?.name||c.name,link:c.profileUrl,description:r.profile?.description??c.description??'',followers:c.membersCount||0,last_activity:r.opportunity.signals[0]?.publishedAt||'Не проверена',music_links:r.profile?.music_links||c.profileUrl,contacts:r.profile?.contacts||c.profileUrl,avatar:c.avatar||'',raw_data:'',status:toStatus[r.status],notes:r.note,created_at:r.firstSeen,updated_at:r.lastSeen,opportunity:r.opportunity,follow_up:r.followUpAt,value_rub:r.valueRub};
+ return {id:r.id,vk_id:String(c.ownerId),name:r.profile?.name||c.name,link:c.profileUrl,description:r.profile?.description??c.description??'',followers:c.membersCount||0,last_activity:r.opportunity.signals[0]?.publishedAt||'Не проверена',music_links:r.profile?.music_links||c.profileUrl,contacts:r.profile?.contacts||c.profileUrl,avatar:c.avatar||'',raw_data:'',status:toStatus[r.status],notes:r.note,created_at:r.firstSeen,updated_at:r.lastSeen,opportunity:r.opportunity,contacted_at:r.contactedAt,replied_at:r.repliedAt,follow_up:r.followUpAt,value_rub:r.valueRub};
 }
-function legacyExtras(raw:string){const value=parse(raw).__scoutCRM||{};return {follow_up:typeof value.follow_up==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value.follow_up)?value.follow_up:'',value_rub:Number.isFinite(value.value_rub)&&value.value_rub>=0?value.value_rub:0};}
+function legacyExtras(raw:string){const value=parse(raw).__scoutCRM||{};return {contacted_at:typeof value.contacted_at==='string'?value.contacted_at:undefined,replied_at:typeof value.replied_at==='string'?value.replied_at:undefined,follow_up:typeof value.follow_up==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value.follow_up)?value.follow_up:'',value_rub:Number.isFinite(value.value_rub)&&value.value_rub>=0?value.value_rub:0};}
 export async function allArtists():Promise<ArtistRecord[]>{
  const current=await loadRecords(),legacy=await safeInvoke<ArtistRecord[]>('db_get_artists');
  if(!Array.isArray(legacy))throw new Error('Некорректный формат старой CRM');
@@ -41,13 +41,13 @@ export async function crmInvoke<T=any>(command:string,args:Record<string,any>={}
  case 'db_save_artist':{
  const a=args.artist as ArtistRecord;if(!a?.name?.trim())throw new Error('Укажите имя артиста');
  if(a.opportunity){await updateProfile(a.id,{name:a.name,description:a.description,contacts:a.contacts,music_links:a.music_links});await updateRecord(a.id,{status:fromStatus[a.status],note:a.notes,followUpAt:a.follow_up||'',valueRub:a.value_rub||0});output=a.id;}
- else{const raw=parse(a.raw_data);raw.__scoutCRM={follow_up:a.follow_up||'',value_rub:Math.max(0,Number(a.value_rub)||0)};output=await safeInvoke(command,{artist:{...a,raw_data:JSON.stringify(raw)}});}break;
+ else{const raw=parse(a.raw_data),meta=legacyExtras(a.raw_data),at=new Date().toISOString();raw.__scoutCRM={...meta,follow_up:a.follow_up||'',value_rub:Math.max(0,Number(a.value_rub)||0),contacted_at:meta.contacted_at||(['Написали','Ответил','Переговоры','Клиент'].includes(a.status)?at:undefined),replied_at:meta.replied_at||(['Ответил','Переговоры','Клиент'].includes(a.status)?at:undefined)};output=await safeInvoke(command,{artist:{...a,raw_data:JSON.stringify(raw)}});}break;
  }
  case 'db_update_notes':case 'db_update_status':{
  const a=await resolved(args.id);const status=args.status as CRMStatus;
  if(command==='db_update_status'&&!fromStatus[status])throw new Error('Некорректный статус');
  if(a.opportunity)await updateRecord(a.id,command==='db_update_status'?{status:fromStatus[status]}:{note:String(args.notes)});
- else{await safeInvoke(command,{...args,id:a.id});await safeInvoke('db_save_history',{artistId:a.id,recordType:'status',content:command==='db_update_status'?'Статус: '+status:String(args.notes)});}break;
+ else{if(command==='db_update_status')await crmInvoke('db_save_artist',{artist:{...a,status}});else await safeInvoke(command,{...args,id:a.id});await safeInvoke('db_save_history',{artistId:a.id,recordType:'status',content:command==='db_update_status'?'Статус: '+status:String(args.notes)});}break;
  }
  case 'db_delete_artist':{const a=await resolved(args.id);if(a.opportunity)await removeRecord(a.id);else await safeInvoke(command,{id:a.id});break;}
  default:return safeInvoke(command,args);
