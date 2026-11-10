@@ -1,316 +1,67 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { safeInvoke } from '../utils/tauriBridge';
-import { useSettingsStore } from '../stores/settings';
-import { useSearchStore } from '../stores/search';
-import { useToast } from '../composables/useToast';
-import { 
-  Plus, 
-  User, 
-  ExternalLink, 
-  Check, 
-  ShieldAlert, 
-  Sparkles, 
-  Flame,
-  Brain,
-  CheckCircle2,
-  Star,
-  MessageSquare,
-  XCircle,
-  ChevronDown,
-  ChevronUp,
-  Copy,
-  Heart,
-  Headphones,
-  Send
-} from '@lucide/vue';
-import { useRouter } from 'vue-router';
-
-const store = useSettingsStore();
-const searchStore = useSearchStore();
-const toast = useToast();
-const router = useRouter();
-
-const showRejectedList = ref<boolean>(false);
-const existingVkIds = ref<Map<string, string>>(new Map());
-
-// Message Generator Modal State
-const showMessageModal = ref<boolean>(false);
-const selectedItemForMsg = ref<any>(null);
-const activeTabMsg = ref<'friendly' | 'pro' | 'direct'>('friendly');
-const generatedVariants = ref<{ friendly: string; pro: string; direct: string }>({
-  friendly: '',
-  pro: '',
-  direct: ''
-});
-const isGeneratingMsg = ref<boolean>(false);
-
-const openExternal = (url: string) => {
-  safeInvoke('open_url', { url }).catch(e => console.error(e));
-};
-
-const loadExistingArtists = async () => {
-  try {
-    const dbArtists: any[] = await safeInvoke('db_get_artists');
-    const map = new Map<string, string>();
-    for (const a of dbArtists) {
-      if (a.vk_id) map.set(a.vk_id.toString(), a.id);
-    }
-    existingVkIds.value = map;
-  } catch (e) {
-    console.error('Error fetching existing artists:', e);
-  }
-};
-
-onMounted(() => {
-  loadExistingArtists();
-});
-
-const withTimeout = <T>(promise: Promise<T>, timeoutMs: number, fallback: T): Promise<T> => {
-  return Promise.race([
-    promise,
-    new Promise<T>((resolve) => setTimeout(() => resolve(fallback), timeoutMs))
-  ]);
-};
-
-const startClientSearch = async () => {
-  if (!store.vkToken) {
-    searchStore.error = 'Укажите VK access_token в Настройках приложения перед запуском';
-    return;
-  }
-
-  if (searchStore.isSearching) return;
-
-  searchStore.isSearching = true;
-  searchStore.resetSearch();
-
-  try {
-    let candidateItems: any[] = [];
-    const queryInput = searchStore.userSearchQuery.trim();
-
-    searchStore.currentStep = 1;
-    searchStore.stepMessage = '🧠 [1/4] ИИ формирует многожанровую стратегию...';
-
-    const strategy: any = await withTimeout(
-      safeInvoke('ai_build_search_strategy', {
-        prompt: queryInput,
-        baseUrl: store.aiBaseUrl || '',
-        apiKey: store.aiApiKey || '',
-        model: store.aiModel || ''
-      }),
-      4000,
-      { intent_summary: queryInput, query_vectors: ['вокалистка', 'поп певец', 'рок группа', 'инди певица'] }
-    );
-    searchStore.strategyInfo = strategy;
-
-    searchStore.currentStep = 2;
-    searchStore.stepMessage = '📡 [2/4] Сканирование 30 неповторяющихся артистов всех жанров (100 - 50 000 подп.)...';
-
-    const searchRes: any = await safeInvoke('vk_multi_vector_search', {
-      queries: strategy.query_vectors || ['вокалистка', 'поп певец', 'рок группа', 'инди певица'],
-      token: store.vkToken
-    });
-
-    if (!searchRes || !searchRes.items || searchRes.items.length === 0) {
-      searchStore.error = 'Не найдено новых сообществ артистов по вектору в VK.';
-      searchStore.currentStep = 0;
-      searchStore.isSearching = false;
-      return;
-    }
-    candidateItems = searchRes.items;
-
-    const selectedItems = candidateItems.slice(0, 30);
-    searchStore.rawCandidates = selectedItems;
-
-    searchStore.currentStep = 3;
-    searchStore.stepMessage = `🎯 [3/4] ИИ параллельно анализирует 30 карточек клиентов...`;
-
-    const targetList: any[] = [];
-    const rejectedList: any[] = [];
-
-    const batchSize = 4;
-    for (let i = 0; i < selectedItems.length; i += batchSize) {
-      const batch = selectedItems.slice(i, i + batchSize);
-      
-      await Promise.all(
-        batch.map(async (item) => {
-          try {
-            let wallPostsText = item.signal_post_text ? `Крайний релиз: ${item.signal_post_text}\n` : '';
-            
-            try {
-              const wallRes: any = await withTimeout(
-                safeInvoke('vk_get_wall', { id: item.id.toString(), token: store.vkToken }),
-                2500,
-                null
-              );
-              if (wallRes && wallRes.items && Array.isArray(wallRes.items)) {
-                const postsSnippets = wallRes.items.slice(0, 4).map((p: any, idx: number) => {
-                  const pText = p.text ? p.text.replace(/\n+/g, ' ') : '[Без текста]';
-                  return `Пост #${idx + 1}: ${pText}`;
-                });
-                wallPostsText += postsSnippets.join('\n');
-              }
-            } catch (e) {
-              console.warn('Wall fetch error', e);
-            }
-
-            const candidateData = `Название: ${item.name}\nОписание: ${item.description || item.activity || 'Не указано'}\nПодписчиков: ${item.members_count || 0}`;
-
-            const profileRes: any = await withTimeout(
-              safeInvoke('ai_profile_candidate_v2', {
-                candidateData,
-                wallPostsText,
-                baseUrl: store.aiBaseUrl || '',
-                apiKey: store.aiApiKey || '',
-                model: store.aiModel || ''
-              }),
-              3500,
-              {
-                artist_type: 'Независимый артист',
-                confidence_percent: 90,
-                is_target: true,
-                commercial_score: 88,
-                summary: item.description || 'Артист ВКонтакте',
-                reasons: ['Артист с аудитории от 100 до 50k'],
-                asv_reason: 'Перспективный клиент для ASV Production'
-              }
-            );
-
-            if (profileRes) {
-              searchStore.aiProfileMap[item.id.toString()] = profileRes;
-              if (profileRes.is_target) {
-                targetList.push(item);
-              } else {
-                rejectedList.push(item);
-              }
-            }
-          } catch (e) {
-            console.warn('Profiling error', e);
-          }
-        })
-      );
-    }
-
-    searchStore.filteredResults = targetList;
-    searchStore.rejectedResults = rejectedList;
-
-    searchStore.currentStep = 4;
-    searchStore.stepMessage = `⭐ [4/4] Готово! Найдено ${targetList.length} свежих клиентов (Отклонено ИИ: ${rejectedList.length} объектов).`;
-    toast.show(`Загружено ${targetList.length} клиентов!`, 'success');
-
-  } catch (e: any) {
-    searchStore.error = e.toString();
-    toast.show(`Ошибка поиска: ${e}`, 'error');
-    searchStore.currentStep = 0;
-  } finally {
-    searchStore.isSearching = false;
-  }
-};
-
-const generateMessageForArtist = async (item: any) => {
-  selectedItemForMsg.value = item;
-  activeTabMsg.value = 'friendly';
-  isGeneratingMsg.value = true;
-  showMessageModal.value = true;
-
-  try {
-    const aiData = searchStore.aiProfileMap[item.id.toString()];
-    const trackOrPost = item.signal_post_text || (aiData?.reasons && aiData.reasons[1]) || item.name;
-
-    const res: any = await safeInvoke('ai_generate_team_message', {
-      artistName: item.name || 'Артист',
-      trackOrPost: trackOrPost,
-      baseUrl: store.aiBaseUrl || '',
-      apiKey: store.aiApiKey || '',
-      model: store.aiModel || ''
-    });
-
-    if (res) {
-      generatedVariants.value = {
-        friendly: res.variant_friendly || `Привет! Наша команда ASV Production послушала ваш трек «${trackOrPost}». Очень крутой вайб! Мы профессионально занимаемся сведением и мастерингом. Будем рады помочь довести звук до премиального уровня!`,
-        pro: res.variant_pro || `Привет! Обратили внимание на ваш проект «${item.name}». У вас отличная подача. Команда ASV Production делает сведение, мастеринг и аранжировки. Если хотите довести sound-дизайн до топового коммерческого уровня — с радостью подключаемся!`,
-        direct: res.variant_direct || `Привет! Команда ASV Production на связи. Послушали ваш материал «${trackOrPost}» — мощная задумка! Занимаемся профессиональным продакшном. Будем рады помочь со звуком!`
-      };
-    }
-  } catch (e: any) {
-    toast.show(`Ошибка генерации: ${e}`, 'error');
-  } finally {
-    isGeneratingMsg.value = false;
-  }
-};
-
-const copyActiveMessage = () => {
-  const textToCopy = generatedVariants.value[activeTabMsg.value];
-  if (textToCopy) {
-    navigator.clipboard.writeText(textToCopy);
-    toast.show('Человечное сообщение скопировано! 📋', 'success');
-  }
-};
-
-const addToCRM = async (item: any, initialStatus = 'Новый') => {
-  try {
-    const aiData = searchStore.aiProfileMap[item.id.toString()];
-    let initialNotes = '';
-    if (aiData) {
-      initialNotes = `[AI Lead Score: ${aiData.commercial_score}/100]\nОписание: ${aiData.summary || ''}\nВывод: ${aiData.asv_reason}`;
-    }
-
-    const artist = {
-      id: '',
-      vk_id: item.id.toString(),
-      name: item.name || 'Потенциальный клиент',
-      link: `https://vk.com/${item.screen_name || ('public' + item.id)}`,
-      description: item.description || item.activity || '',
-      followers: item.members_count || 0,
-      last_activity: 'Активный паблик',
-      music_links: `https://vk.com/${item.screen_name || ('public' + item.id)}`,
-      contacts: `https://vk.com/${item.screen_name || ('public' + item.id)}`,
-      avatar: item.photo_200 || item.photo_100 || '',
-      raw_data: JSON.stringify(item),
-      status: initialStatus,
-      notes: initialNotes
-    };
-
-    const savedId: string = await safeInvoke('db_save_artist', { artist });
-    existingVkIds.value.set(item.id.toString(), savedId);
-
-    toast.show(`"${artist.name}" добавлен в CRM!`, 'success');
-  } catch (e: any) {
-    toast.show(`Ошибка сохранения: ${e}`, 'error');
-  }
-};
-
-const openExisting = (artistId: string) => {
-  router.push(`/artist/${artistId}`);
-};
+import {ref,onMounted} from 'vue';
+import {useSearchStore} from '../stores/search';
+import {useToast} from '../composables/useToast';
+import {useRouter} from 'vue-router';
+import {allArtists,identity,saveOpportunity} from '../scout/crm';
+import {openExternal as openLink} from '../utils/tauriBridge';
+import {draftOutreach,SERVICE_LABEL,type Opportunity} from '../scout/opportunity';
+import {Plus,User,ExternalLink,Check,ShieldAlert,Sparkles,Flame,Brain,CheckCircle2,Star,MessageSquare,Copy,Heart,Headphones,Send} from '@lucide/vue';
+const searchStore=useSearchStore(),toast=useToast(),router=useRouter();
+const existingVkIds=ref(new Map<string,string>()),saving=ref(new Set<string>());
+const showMessageModal=ref(false),selectedItemForMsg=ref<{name:string}|null>(null),activeTabMsg=ref<'friendly'|'pro'|'direct'>('friendly');
+const generatedVariants=ref({friendly:'',pro:'',direct:''});const expanded=ref(new Set<string>());
+async function openExternal(url:string){try{await openLink(url);}catch(e){toast.show(String(e),'error');}}
+async function loadExisting(){try{existingVkIds.value=new Map((await allArtists()).map(a=>[identity(a)||a.id,a.id]));}catch(e){toast.show(String(e),'error');}}onMounted(loadExisting);
+async function startClientSearch(){await searchStore.start();await loadExisting();}
+function toggleEvidence(id:string){const next=new Set(expanded.value);if(next.has(id))next.delete(id);else next.add(id);expanded.value=next;}
+function generateMessageForArtist(item:{name:string;opportunity:Opportunity}){
+ selectedItemForMsg.value=item;const draft=draftOutreach(item.opportunity);
+ generatedVariants.value={friendly:draft,pro:draft.replace('Привет,','Здравствуйте,').replace('Подскажите,','Уточните, пожалуйста,'),direct:draft.replace('Мы ASV Production — команда музыкального продакшна.','ASV Production на связи.')};showMessageModal.value=true;
+}
+async function copyActiveMessage(){try{await navigator.clipboard.writeText(generatedVariants.value[activeTabMsg.value]);toast.show('Черновик скопирован. Отправка — вручную.','success');}catch{toast.show('Буфер недоступен. Выделите и скопируйте текст вручную.','error');}}
+async function addToCRM(item:{id:string;opportunity:Opportunity},status:'Новый'|'Избранное'='Новый'){
+ if(saving.value.has(item.id))return;saving.value.add(item.id);
+ try{const id=await saveOpportunity(item.opportunity,status);existingVkIds.value.set(item.id,id);toast.show('Артист сохранён в CRM','success');}catch(e){toast.show(String(e),'error');}finally{saving.value.delete(item.id);}
+}
+function openExisting(id:string){router.push('/artist/'+encodeURIComponent(id));}
 </script>
 
 <template>
   <div class="scout-v2-page">
     <div class="page-header mb-4">
       <h1>AI Music Scout — Поиск Клиентов ASV Production</h1>
-      <p class="text-sm text-muted">Выгрузка 30 неповторяющихся артистов всех жанров. Персонализированные оферы от нашей команды (ASV Production).</p>
+      <p class="text-sm text-muted">Hot / Growth: проверяемые музыкальные проекты и реальные коммерческие потребности.</p>
     </div>
 
     <!-- ONE CLICK SEARCH BOX -->
     <div class="glass-card mb-4 scout-input-card">
       <div class="flex items-center justify-between">
         <div>
-          <h3 class="font-bold text-primary mb-1">Загрузить 30 клиентов (от нашей команды)</h3>
-          <p class="text-xs text-muted">ИИ (gen-api.ru / LLM) сканирует сольных артистов без повторов и формирует живые личные оферы.</p>
+          <h3 class="font-bold text-primary mb-1">Найти клиентов для ASV Production</h3>
+          <p class="text-xs text-muted">Поиск оригинальных публикаций, проверка профилей и потребностей. Сохраняйте выбранных артистов в CRM.</p>
         </div>
 
-        <button 
-          class="btn btn-purple scout-start-btn" 
-          @click="startClientSearch" 
+        <button
+          class="btn btn-purple scout-start-btn"
+          @click="startClientSearch"
           :disabled="searchStore.isSearching"
         >
           <Sparkles :size="20" />
-          <span>{{ searchStore.isSearching ? 'Скаутинг 30...' : '🚀 Загрузить 30 клиентов' }}</span>
+          <span>{{ searchStore.isSearching ? 'Поиск выполняется...' : '🚀 Найти клиентов' }}</span>
         </button>
       </div>
     </div>
 
+    <div class="glass-card mb-4 flex items-center gap-3 search-controls">
+      <input type="text" class="glass-input" v-model="searchStore.userSearchQuery" placeholder="Жанры или проекты через запятую" aria-label="Жанры или проекты" :disabled="searchStore.isSearching" />
+      <select v-model="searchStore.filter" aria-label="Фильтр возможностей"><option value="all">Hot + Growth</option><option value="hot">Hot — актуальный запрос</option><option value="growth">Growth — развитие</option></select>
+      <button class="btn btn-secondary" :disabled="searchStore.isSearching" @click="searchStore.showDemo">{{searchStore.demo?'Закрыть демо':'Демо'}}</button>
+      <button v-if="searchStore.isSearching" class="btn btn-danger" @click="searchStore.cancel">Отменить поиск</button>
+    </div>
+    <div v-if="searchStore.demo" class="alert-box mb-4" role="status">ДЕМО: артисты и публикации вымышлены. Запись в CRM и внешние ссылки отключены.</div>
+    <div v-if="searchStore.state==='cancelled' || searchStore.state==='empty'" class="glass-card mb-4" role="status">{{searchStore.stepMessage}}</div>
+    <details v-if="searchStore.report" class="glass-card mb-4"><summary>Диагностика поиска</summary><p class="text-sm">Публикаций: {{searchStore.report.postCount}} · Исключено: {{searchStore.report.rejected}} · Недостаточно данных: {{searchStore.report.unverified}}</p><p v-for="(failure,i) in searchStore.report.failures" :key="i" class="text-xs text-danger">{{failure}}</p></details>
     <!-- Interactive Stepper Progress Display -->
     <div v-if="searchStore.currentStep > 0" class="glass-card mb-4 stepper-card">
       <div class="flex items-center gap-3 mb-2">
@@ -329,19 +80,19 @@ const openExisting = (artistId: string) => {
     <!-- Target Results Grid -->
     <div v-if="searchStore.filteredResults.length > 0" class="results-container mb-6">
       <div class="results-header mb-4 flex justify-between items-center">
-        <span class="text-sm text-muted">Одобрено ИИ (30 целевых клиентов от 100 до 50 000 подп.): <strong>{{ searchStore.filteredResults.length }}</strong></span>
+        <span class="text-sm text-muted">Подтверждённые возможности: <strong>{{ searchStore.filteredResults.length }}</strong></span>
       </div>
 
       <div class="results-list">
-        <div 
-          v-for="item in searchStore.filteredResults" 
-          :key="item.id" 
+        <div
+          v-for="item in searchStore.filteredResults"
+          :key="item.id"
           class="glass-card candidate-card-v2 mb-4"
-          :class="{ 'high-score-card': searchStore.aiProfileMap[item.id.toString()]?.commercial_score && searchStore.aiProfileMap[item.id.toString()].commercial_score >= 80 }"
+          :class="{ 'high-score-card': searchStore.evidenceMap[item.id.toString()]?.commercial_score && (searchStore.evidenceMap[item.id.toString()].commercial_score??0) >= 80 }"
         >
           <!-- Left Column: Avatar -->
           <div class="card-left">
-            <img v-if="item.photo_200 || item.photo_100" :src="item.photo_200 || item.photo_100" class="avatar-v2" alt="avatar" />
+            <img v-if="item.photo_200 || item.photo_100" :src="item.photo_200 || item.photo_100" class="avatar-v2" alt="avatar" referrerpolicy="no-referrer" />
             <div v-else class="avatar-placeholder"><User :size="36" /></div>
           </div>
 
@@ -350,19 +101,19 @@ const openExisting = (artistId: string) => {
             <div class="flex items-center justify-between mb-1">
               <div class="flex items-center gap-2">
                 <h2 class="artist-title">{{ item.name }}</h2>
-                <a href="#" @click.prevent="openExternal(`https://vk.com/${item.screen_name || ('public' + item.id)}`)" class="vk-link text-xs">
+                <a href="#" @click.prevent="!searchStore.demo && openExternal(item.opportunity.candidate.profileUrl)" class="vk-link text-xs">
                   vk.com/{{ item.screen_name || ('public' + item.id) }} <ExternalLink :size="12" />
                 </a>
               </div>
 
               <!-- AI Lead Score Badge (0-100) -->
-              <div v-if="searchStore.aiProfileMap[item.id.toString()]" class="flex items-center gap-2">
+              <div v-if="searchStore.evidenceMap[item.id.toString()]" class="flex items-center gap-2">
                 <span class="confidence-pill flex items-center gap-1">
-                  <Brain :size="12" /> {{ searchStore.aiProfileMap[item.id.toString()].artist_type }}
+                  <Brain :size="12" /> {{ searchStore.evidenceMap[item.id.toString()].artist_type }}
                 </span>
-                
+
                 <span class="score-badge flex items-center gap-1">
-                  <Flame :size="14" /> AI Lead Score: {{ searchStore.aiProfileMap[item.id.toString()].commercial_score }} / 100
+                  <Flame :size="14" /> Opportunity: {{ searchStore.evidenceMap[item.id.toString()].commercial_score }} / 100
                 </span>
               </div>
             </div>
@@ -381,32 +132,39 @@ const openExisting = (artistId: string) => {
             <div class="ai-punchline-box text-xs mb-2 flex items-center gap-2">
               <span class="ai-sparkle-pill flex items-center gap-1 font-bold">
                 <Sparkles :size="13" color="#53f6e4" />
-                <span>Суть ИИ:</span>
+                <span>Сигнал:</span>
               </span>
               <span class="punchline-text text-muted font-medium">
-                {{ searchStore.aiProfileMap[item.id.toString()]?.summary || 'Независимый музыкальный проект с коммерческим потенциалом.' }}
+                {{ searchStore.evidenceMap[item.id.toString()]?.summary || 'Недостаточно данных для оценки.' }}
               </span>
             </div>
 
+            <div class="text-xs mb-2" v-if="item.opportunity.service">{{SERVICE_LABEL[item.opportunity.service]}}</div>
+            <button class="btn btn-secondary btn-sm mb-2" @click="toggleEvidence(item.id)">Публикации и оценка</button>
+            <div v-if="expanded.has(item.id)" class="evidence-panel text-xs">
+              <p>Релевантность: {{item.opportunity.assessment?.music==='supported'?'Музыкальный контекст подтверждён':'Не проверено'}} · Данные: {{searchStore.demo?'Демо':item.opportunity.confidence==='source_only'?'Оригинальная публикация из VK':'Нужна проверка'}}</p>
+              <article v-for="signal in item.opportunity.signals" :key="signal.id" class="mb-3"><strong>{{new Date(signal.publishedAt).toLocaleDateString('ru-RU')}} · {{signal.description}}</strong><p>{{signal.quote}}</p><p>Владелец: {{signal.sourceOwnerId}} · Автор: {{signal.authorId??'неизвестен'}}</p><button class="btn btn-secondary btn-sm" :disabled="searchStore.demo" @click="openExternal(signal.url)">Открыть источник</button></article>
+              <p v-if="item.opportunity.factors">Факторы (0–100): потребность {{item.opportunity.factors.need}} × 0,35; актуальность {{item.opportunity.factors.timing}} × 0,25; услуги {{item.opportunity.factors.fit}} × 0,20; активность {{item.opportunity.factors.activity}} × 0,10; контакт {{item.opportunity.factors.contact}} × 0,10. Балл не является вероятностью заказа.</p>
+            </div>
             <!-- ASV Production Fit Rationale -->
-            <div v-if="searchStore.aiProfileMap[item.id.toString()]?.asv_reason" class="asv-reason-box text-xs">
-              <span class="font-bold text-secondary">Перспектива для ASV:</span> {{ searchStore.aiProfileMap[item.id.toString()].asv_reason }}
+            <div v-if="searchStore.evidenceMap[item.id.toString()]?.asv_reason" class="asv-reason-box text-xs">
+              <span class="font-bold text-secondary">Перспектива для ASV:</span> {{ searchStore.evidenceMap[item.id.toString()].asv_reason }}
             </div>
           </div>
 
           <!-- Right Column: Actions -->
           <div class="card-actions-v2">
-            <button 
+            <button
               class="btn btn-purple btn-sm flex items-center gap-1"
               @click="generateMessageForArtist(item)"
-              title="Сгенерировать 3 человечных сообщения от нашей команды"
+              title="Сгенерировать черновики от нашей команды"
             >
               <MessageSquare :size="15" />
               <span>Сообщение</span>
             </button>
 
-            <button 
-              v-if="existingVkIds.has(item.id.toString())" 
+            <button
+              v-if="existingVkIds.has(item.id.toString())"
               class="btn btn-secondary btn-sm flex items-center gap-1"
               @click="openExisting(existingVkIds.get(item.id.toString())!)"
             >
@@ -415,17 +173,17 @@ const openExisting = (artistId: string) => {
             </button>
 
             <template v-else>
-              <button 
-                class="btn btn-primary btn-sm flex items-center gap-1" 
-                @click="addToCRM(item, 'Новый')"
+              <button
+                class="btn btn-primary btn-sm flex items-center gap-1"
+                :disabled="searchStore.demo || saving.has(item.id)" @click="addToCRM(item, 'Новый')"
               >
                 <Plus :size="16" />
                 <span>В CRM</span>
               </button>
 
-              <button 
-                class="btn btn-secondary btn-sm flex items-center gap-1" 
-                @click="addToCRM(item, 'Избранное')"
+              <button
+                class="btn btn-secondary btn-sm flex items-center gap-1"
+                :disabled="searchStore.demo || saving.has(item.id)" @click="addToCRM(item, 'Избранное')"
                 title="Добавить в Избранное ⭐"
               >
                 <Star :size="16" color="#fde047" />
@@ -436,60 +194,22 @@ const openExisting = (artistId: string) => {
       </div>
     </div>
 
-    <!-- REJECTED BY AI ACCORDION -->
-    <div v-if="searchStore.rejectedResults.length > 0" class="glass-card rejected-accordion-card mb-6">
-      <div 
-        class="rejected-header flex items-center justify-between cursor-pointer p-4"
-        @click="showRejectedList = !showRejectedList"
-      >
-        <div class="flex items-center gap-2">
-          <XCircle color="#ef4444" :size="20" />
-          <span class="font-bold text-sm text-red-400">Отклонено ИИ (фан-клубы, электрика, блоги): <strong>{{ searchStore.rejectedResults.length }}</strong></span>
-        </div>
-        <component :is="showRejectedList ? ChevronUp : ChevronDown" :size="20" class="text-muted" />
-      </div>
-
-      <div v-if="showRejectedList" class="rejected-body p-4 pt-0">
-        <div 
-          v-for="item in searchStore.rejectedResults" 
-          :key="item.id" 
-          class="rejected-item-box mb-3 text-xs"
-        >
-          <div class="flex items-center justify-between mb-1">
-            <span class="font-bold text-primary">{{ item.name }}</span>
-            <a href="#" @click.prevent="openExternal(`https://vk.com/${item.screen_name || ('public' + item.id)}`)" class="text-muted">
-              vk.com/{{ item.screen_name || ('public' + item.id) }} <ExternalLink :size="12" />
-            </a>
-          </div>
-
-          <div class="rejection-reason-text">
-            🧠 {{ searchStore.aiProfileMap[item.id.toString()]?.rejection_reason || 'Отклонено ИИ: Объект признан инородным пабликом' }}
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- OUTREACH MESSAGE GENERATOR MODAL (3 HUMAN TEAM VARIANTS) -->
     <div v-if="showMessageModal" class="modal-overlay" @click.self="showMessageModal = false">
-      <div class="glass-card modal-content p-6">
+      <div class="glass-card modal-content p-6" role="dialog" aria-modal="true" aria-label="Черновик обращения">
         <div class="flex justify-between items-center mb-4">
           <h3 class="font-bold text-lg text-primary flex items-center gap-2">
-            <MessageSquare :size="20" /> Персонализированное сообщение от команды ASV
+            <MessageSquare :size="20" /> Черновик обращения от команды ASV
           </h3>
           <button class="btn btn-secondary btn-sm" @click="showMessageModal = false">✕</button>
         </div>
 
-        <div v-if="isGeneratingMsg" class="p-8 text-center">
-          <div class="spinner-ring mx-auto mb-3"></div>
-          <p class="text-sm text-muted">ИИ формирует 3 живых человечных офера от нашей команды (ASV Production)...</p>
-        </div>
-
-        <div v-else class="space-y-4">
+        <div class="space-y-4">
           <div class="text-xs text-muted">Кому: <strong>{{ selectedItemForMsg?.name }}</strong> (от нашей команды)</div>
-          
+
           <!-- 3 HUMAN TONES TABS -->
           <div class="flex gap-2 mb-2 border-b border-purple-500/20 pb-2">
-            <button 
+            <button
               class="btn btn-sm text-xs flex items-center gap-1"
               :class="activeTabMsg === 'friendly' ? 'btn-purple' : 'btn-secondary'"
               @click="activeTabMsg = 'friendly'"
@@ -497,7 +217,7 @@ const openExisting = (artistId: string) => {
               <Heart :size="14" /> 🤝 Искренний / Дружеский
             </button>
 
-            <button 
+            <button
               class="btn btn-sm text-xs flex items-center gap-1"
               :class="activeTabMsg === 'pro' ? 'btn-purple' : 'btn-secondary'"
               @click="activeTabMsg = 'pro'"
@@ -505,7 +225,7 @@ const openExisting = (artistId: string) => {
               <Headphones :size="14" /> 🎧 Студийный / Стилистический
             </button>
 
-            <button 
+            <button
               class="btn btn-sm text-xs flex items-center gap-1"
               :class="activeTabMsg === 'direct' ? 'btn-purple' : 'btn-secondary'"
               @click="activeTabMsg = 'direct'"
@@ -514,9 +234,9 @@ const openExisting = (artistId: string) => {
             </button>
           </div>
 
-          <textarea 
-            v-model="generatedVariants[activeTabMsg]" 
-            rows="6" 
+          <textarea
+            aria-label="Текст обращения" v-model="generatedVariants[activeTabMsg]"
+            rows="6"
             class="w-full text-sm p-3 glass-input border border-purple-500/30 rounded-lg"
           ></textarea>
 
@@ -700,4 +420,6 @@ const openExisting = (artistId: string) => {
   background: rgba(18, 14, 38, 0.95);
   border: 1px solid rgba(157, 78, 221, 0.4);
 }
+.search-controls{flex-wrap:wrap}.search-controls input{flex:1;min-width:190px}.search-controls select{width:auto}.evidence-panel{padding:12px;border:1px solid var(--glass-border);border-radius:8px;line-height:1.6;overflow-wrap:anywhere}@media(max-width:768px){.scout-input-card>.flex,.card-main>.flex{flex-wrap:wrap;gap:12px}.search-controls input{flex:1 1 100%;width:100%}.search-controls select,.search-controls>.btn{flex:1;min-width:0;width:auto}.scout-start-btn{width:100%}.modal-content{max-height:85vh;overflow:auto}.modal-content .flex{flex-wrap:wrap}}
+.vk-link{color:var(--primary);text-decoration:none}.search-controls input{padding:12px;min-height:44px}
 </style>

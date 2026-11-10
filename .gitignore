@@ -23,3 +23,12 @@ dist-ssr
 *.sln
 *.sw?
 /src-tauri/target
+
+.test-dist/
+test-results/
+*.db
+*.db-wal
+*.db-shm
+.env*
+
+.original-ui/

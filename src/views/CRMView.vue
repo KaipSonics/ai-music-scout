@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
-import { 
-  UserPlus, 
-  Eye, 
-  Send, 
-  MessageSquare, 
-  CheckCircle, 
-  XCircle, 
+import {
+  UserPlus,
+  Eye,
+  Send,
+  MessageSquare,
+  CheckCircle,
+  XCircle,
   Star,
   Search,
   MessageCircle,
@@ -17,7 +17,7 @@ import {
 } from '@lucide/vue';
 import type { ArtistRecord, CRMStatus } from '../types/artist';
 import { useToast } from '../composables/useToast';
-import { safeInvoke } from '../utils/tauriBridge';
+import {crmInvoke as safeInvoke,exportCRM,importCRM,csvCRM} from '../scout/crm';
 
 const router = useRouter();
 const toast = useToast();
@@ -38,6 +38,8 @@ const columns: { id: CRMStatus; name: string; icon: any; class: string }[] = [
   { id: 'Написали', name: 'Написали', icon: Send, class: 'status-contacted' },
   { id: 'Ответил', name: 'Ответил', icon: MessageSquare, class: 'status-replied' },
   { id: 'Клиент', name: 'Клиент', icon: CheckCircle, class: 'status-client' },
+  {id:'Переговоры',name:'Переговоры',icon:MessageSquare,class:'status-replied'},
+  {id:'Отложен',name:'Отложен',icon:Eye,class:'status-inspected'},
   { id: 'Избранное', name: 'Избранное', icon: Star, class: 'status-favorite' },
   { id: 'Не актуален', name: 'Не актуален', icon: XCircle, class: 'status-rejected' },
 ];
@@ -59,89 +61,16 @@ onMounted(() => {
   loadArtists();
 });
 
-const exportDatabaseJson = () => {
-  if (artists.value.length === 0) {
-    toast.show('Воронка пуста — нечего экспортировать', 'info');
-    return;
-  }
-
-  const exportData = {
-    app: 'AI Music Scout v2.0 - ASV Production',
-    exported_at: new Date().toISOString(),
-    total_records: artists.value.length,
-    artists: artists.value
-  };
-
-  const jsonStr = JSON.stringify(exportData, null, 2);
-  const blob = new Blob([jsonStr], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `asv_crm_export_${new Date().toISOString().slice(0, 10)}.json`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-
-  toast.show(`Выгружено ${artists.value.length} артистов в файл!`, 'success');
-};
-
-const triggerFileInput = () => {
-  if (fileInput.value) {
-    fileInput.value.click();
-  }
-};
-
-const handleImportJson = async (event: Event) => {
-  const target = event.target as HTMLInputElement;
-  if (!target.files || target.files.length === 0) return;
-
-  const file = target.files[0];
-  const reader = new FileReader();
-
-  reader.onload = async (e) => {
-    try {
-      const content = e.target?.result as string;
-      const parsed = JSON.parse(content);
-
-      let importedList: ArtistRecord[] = [];
-      if (Array.isArray(parsed)) {
-        importedList = parsed;
-      } else if (parsed && Array.isArray(parsed.artists)) {
-        importedList = parsed.artists;
-      }
-
-      if (importedList.length === 0) {
-        toast.show('В файле не найдено записей артистов', 'info');
-        return;
-      }
-
-      // Merge into database
-      let addedCount = 0;
-      for (const item of importedList) {
-        if (item.name) {
-          await safeInvoke('db_save_artist', { artist: item });
-          addedCount++;
-        }
-      }
-
-      await loadArtists();
-      toast.show(`Успешно импортировано ${addedCount} артистов в воронку!`, 'success');
-    } catch (err: any) {
-      console.error('Import parse error:', err);
-      toast.show('Ошибка чтения файла экспорта JSON', 'error');
-    } finally {
-      if (target) target.value = '';
-    }
-  };
-
-  reader.readAsText(file);
-};
-
+function download(name:string,text:string,type='application/json'){const blob=new Blob([text],{type});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1500);}
+const exportDatabaseJson=async()=>{try{download('ASV-Scout-CRM.json',await exportCRM());toast.show('CRM экспортирована','success');}catch(e){toast.show(String(e),'error');}};
+const exportCsv=()=>download('ASV-Scout-CRM.csv',csvCRM(artists.value),'text/csv;charset=utf-8');
+const triggerFileInput=()=>fileInput.value?.click();
+const handleImportJson=async(event:Event)=>{const input=event.target as HTMLInputElement;const file=input.files?.[0];if(!file)return;try{const count=await importCRM(await file.text());await loadArtists();toast.show('Импортировано: '+count,'success');}catch(e){toast.show(String(e),'error');}finally{input.value='';}};
+const revenue=computed(()=>artists.value.filter(a=>a.status==='Клиент').reduce((n,a)=>n+(a.value_rub||0),0));
 const filteredArtists = computed(() => {
   if (!searchQuery.value.trim()) return artists.value;
   const q = searchQuery.value.toLowerCase().trim();
-  return artists.value.filter(a => 
+  return artists.value.filter(a =>
     (a.name && a.name.toLowerCase().includes(q)) ||
     (a.description && a.description.toLowerCase().includes(q)) ||
     (a.contacts && a.contacts.toLowerCase().includes(q))
@@ -166,13 +95,13 @@ const getVkMeUrl = (link: string) => {
 <template>
   <div class="crm-page">
     <!-- Hidden File Input for Import -->
-    <input 
-      ref="fileInput" 
-      type="file" 
-      accept=".json" 
-      class="hidden" 
-      style="display: none" 
-      @change="handleImportJson" 
+    <input
+      ref="fileInput"
+      type="file"
+      accept=".json"
+      class="hidden"
+      style="display: none"
+      @change="handleImportJson"
     />
 
     <!-- Header Controls -->
@@ -194,28 +123,29 @@ const getVkMeUrl = (link: string) => {
           <span>ЭКСПОРТ</span>
         </button>
 
+        <button class="btn btn-secondary btn-sm" @click="exportCsv">CSV</button>
         <!-- Search filter -->
         <div class="search-box">
           <Search :size="16" class="search-icon" />
-          <input 
-            v-model="searchQuery" 
-            type="text" 
-            placeholder="Фильтр артистов..." 
+          <input
+            v-model="searchQuery"
+            type="text"
+            placeholder="Фильтр артистов..."
             class="search-input"
           />
         </div>
 
         <!-- View Switcher -->
         <div class="view-switch">
-          <button 
-            class="switch-btn" 
+          <button
+            class="switch-btn"
             :class="{ active: activeView === 'board' }"
             @click="activeView = 'board'"
           >
             Доска
           </button>
-          <button 
-            class="switch-btn" 
+          <button
+            class="switch-btn"
             :class="{ active: activeView === 'list' }"
             @click="activeView = 'list'"
           >
@@ -225,6 +155,8 @@ const getVkMeUrl = (link: string) => {
       </div>
     </div>
 
+    <div class="glass-card mb-4 text-sm">Контактов: {{artists.length}} · Ответили: {{artists.filter(a=>a.replied_at||['Ответил','Переговоры','Клиент'].includes(a.status)).length}} · Заказов: {{artists.filter(a=>a.status==='Клиент').length}} · Выручка: {{revenue.toLocaleString('ru-RU')}} ₽ <span class="text-xs text-muted">(отмечено вручную)</span></div>
+    <div v-if="!loading&&!artists.length" class="glass-card mb-4 text-muted">CRM пока пуста. Найдите артистов в <router-link to="/search">поиске</router-link> и добавьте интересных кнопкой «В CRM».</div>
     <!-- Loading State -->
     <div v-if="loading" class="text-muted text-center py-8">
       Загрузка CRM воронки...
@@ -232,9 +164,9 @@ const getVkMeUrl = (link: string) => {
 
     <!-- KANBAN BOARD VIEW -->
     <div v-else-if="activeView === 'board'" class="kanban-board">
-      <div 
-        v-for="col in columns" 
-        :key="col.id" 
+      <div
+        v-for="col in columns"
+        :key="col.id"
         class="kanban-col"
       >
         <!-- Column Header -->
@@ -250,22 +182,22 @@ const getVkMeUrl = (link: string) => {
 
         <!-- Column Cards Container -->
         <div class="kanban-cards-area">
-          <div 
-            v-if="getArtistsByStatus(col.id).length === 0" 
+          <div
+            v-if="getArtistsByStatus(col.id).length === 0"
             class="empty-column-placeholder text-xs text-muted"
           >
             Нет контактов
           </div>
 
-          <div 
-            v-for="artist in getArtistsByStatus(col.id)" 
-            :key="artist.id" 
+          <div
+            v-for="artist in getArtistsByStatus(col.id)"
+            :key="artist.id"
             class="kanban-card glass-card"
             @click="openArtist(artist.id)"
           >
             <!-- Card Header (Avatar + Title) -->
             <div class="card-top flex items-center gap-3 mb-2">
-              <img v-if="artist.avatar" :src="artist.avatar" class="artist-avatar" alt="avatar" />
+              <img v-if="artist.avatar" :src="artist.avatar" class="artist-avatar" alt="avatar" referrerpolicy="no-referrer" />
               <div class="artist-info flex-1 overflow-hidden">
                 <h3 class="artist-name truncate">{{ artist.name }}</h3>
                 <div class="artist-followers text-xs text-muted">
@@ -274,6 +206,8 @@ const getVkMeUrl = (link: string) => {
               </div>
             </div>
 
+            <p v-if="artist.follow_up" class="text-xs text-primary mb-2">Напоминание: {{artist.follow_up}}</p>
+            <p v-if="artist.opportunity" class="text-xs text-primary mb-2">{{artist.opportunity.kind.toUpperCase()}} · {{artist.opportunity.score??'Не проверено'}}</p>
             <!-- Description / Style summary -->
             <p v-if="artist.description" class="artist-desc text-xs text-secondary mb-3 line-clamp-2">
               {{ artist.description }}
@@ -281,7 +215,7 @@ const getVkMeUrl = (link: string) => {
 
             <!-- Card Actions Footer -->
             <div class="card-footer flex justify-between items-center pt-2 border-t border-glass">
-              <button 
+              <button
                 class="action-btn text-xs text-primary flex items-center gap-1"
                 @click.stop="openExternal(getVkMeUrl(artist.link))"
                 title="Написать в сообщество VK"
@@ -290,8 +224,8 @@ const getVkMeUrl = (link: string) => {
                 <span>Написать</span>
               </button>
 
-              <a 
-                href="#" 
+              <a
+                href="#"
                 class="action-btn text-xs text-muted flex items-center gap-1"
                 @click.stop.prevent="openExternal(artist.link)"
                 title="Открыть паблик ВКонтакте"
@@ -324,15 +258,15 @@ const getVkMeUrl = (link: string) => {
                 Артисты не найдены
               </td>
             </tr>
-            <tr 
-              v-for="artist in filteredArtists" 
+            <tr
+              v-for="artist in filteredArtists"
               :key="artist.id"
               class="border-b border-glass-hover hover:bg-white/5 transition-colors cursor-pointer"
               @click="openArtist(artist.id)"
             >
               <td class="py-3 px-2">
                 <div class="flex items-center gap-3">
-                  <img v-if="artist.avatar" :src="artist.avatar" class="w-8 h-8 rounded-full object-cover" alt="avatar" />
+                  <img v-if="artist.avatar" :src="artist.avatar" class="w-8 h-8 rounded-full object-cover" alt="avatar" referrerpolicy="no-referrer" />
                   <div>
                     <div class="font-bold text-sm text-primary">{{ artist.name }}</div>
                     <a href="#" @click.stop.prevent="openExternal(artist.link)" class="text-xs text-muted flex items-center gap-1">
@@ -353,7 +287,7 @@ const getVkMeUrl = (link: string) => {
                 </span>
               </td>
               <td class="py-3 px-2 text-right">
-                <button 
+                <button
                   class="btn btn-secondary btn-xs"
                   @click.stop="openExternal(getVkMeUrl(artist.link))"
                 >
@@ -500,4 +434,5 @@ const getVkMeUrl = (link: string) => {
   background: var(--primary);
   color: #07060f;
 }
+@media(max-width:768px){.crm-header{flex-direction:column;align-items:stretch;gap:16px}.crm-header>.flex{flex-wrap:wrap;gap:8px}.crm-header .search-box{width:100%}.kanban-board{max-width:100%;overflow-x:auto}}
 </style>

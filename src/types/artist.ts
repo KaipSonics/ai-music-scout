@@ -5,7 +5,7 @@ export type CRMStatus =
   | 'Ответил' 
   | 'Клиент' 
   | 'Не актуален' 
-  | 'Избранное';
+  | 'Избранное' | 'Переговоры' | 'Отложен';
 
 export interface CRMContactPerson {
   user_id?: number;
@@ -30,6 +30,11 @@ export interface ArtistRecord {
   raw_data: string;
   status: CRMStatus;
   notes: string;
+  contacted_at?:string;
+  replied_at?:string;
+  follow_up?:string;
+  value_rub?:number;
+  opportunity?:import('../scout/opportunity').Opportunity;
   created_at?: string;
   updated_at?: string;
 }

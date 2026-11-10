@@ -2,20 +2,20 @@
 import { ref, onMounted, watch } from 'vue';
 import { useSettingsStore } from '../stores/settings';
 import { useToast } from '../composables/useToast';
-import { 
-  Key, 
-  Save, 
-  ShieldCheck, 
-  FileCode, 
-  Eye, 
-  EyeOff, 
-  AlertTriangle, 
-  ExternalLink as LinkIcon, 
-  UserCheck, 
-  Sparkles, 
+import {
+  Key,
+  Save,
+  ShieldCheck,
+  FileCode,
+  Eye,
+  EyeOff,
+  AlertTriangle,
+  ExternalLink as LinkIcon,
+  UserCheck,
+  Sparkles,
   CheckCircle2
 } from '@lucide/vue';
-import { safeInvoke } from '../utils/tauriBridge';
+import { openExternal as openLink } from '../utils/tauriBridge';
 
 const store = useSettingsStore();
 const toast = useToast();
@@ -25,6 +25,7 @@ const rawInputToken = ref('');
 const mixingTemplate = ref(store.offerMixingTemplate);
 const arrangementTemplate = ref(store.offerArrangementTemplate);
 const masteringTemplate = ref(store.offerMasteringTemplate);
+const productionTemplate=ref(store.offerProductionTemplate),auditTemplate=ref(store.offerAuditTemplate),saving=ref(false);
 
 const showToken = ref(false);
 const testingToken = ref(false);
@@ -34,7 +35,7 @@ const verifiedUserName = ref('');
 const errorMessage = ref('');
 
 const openExternal = (url: string) => {
-  safeInvoke('open_url', { url }).catch(e => console.error(e));
+  openLink(url).catch(e=>toast.show(String(e),'error'));
 };
 
 // Robust VK Access Token parser for mobile & desktop URLs (m.vk.com, blank.html, etc.)
@@ -50,12 +51,13 @@ const extractCleanToken = (input: string): string => {
 };
 
 onMounted(async () => {
-  await store.loadSettings();
+  try{await store.loadSettings();}catch(e){errorMessage.value=String(e);}
   rawInputToken.value = store.vkToken;
 
   mixingTemplate.value = store.offerMixingTemplate;
   arrangementTemplate.value = store.offerArrangementTemplate;
   masteringTemplate.value = store.offerMasteringTemplate;
+  productionTemplate.value=store.offerProductionTemplate;auditTemplate.value=store.offerAuditTemplate;
 });
 
 watch(rawInputToken, (newVal) => {
@@ -70,13 +72,13 @@ const saveAll = async () => {
   const clean = extractCleanToken(rawInputToken.value);
   rawInputToken.value = clean;
 
-  await store.saveSettings(
+  if(saving.value)return;saving.value=true;try{await store.saveSettings(
     clean,
     mixingTemplate.value,
     arrangementTemplate.value,
-    masteringTemplate.value
+    masteringTemplate.value,productionTemplate.value,auditTemplate.value
   );
-  toast.show('Все настройки сохранены!', 'success');
+  toast.show('Настройки сохранены; токены — только до перезагрузки', 'success');}catch(e){toast.show(String(e),'error');}finally{saving.value=false;}
 };
 
 const testVkToken = async () => {
@@ -94,11 +96,10 @@ const testVkToken = async () => {
   errorMessage.value = '';
 
   try {
-    const res: string = await safeInvoke('vk_test_token', { token: clean });
+    await store.saveVkToken(clean);const res=await store.verifyToken();
     tokenTestSuccess.value = true;
     verifiedUserName.value = res;
     toast.show(`Подключено: ${res}`, 'success');
-    await store.saveVkToken(clean);
   } catch (e: any) {
     tokenTestSuccess.value = false;
     const errStr = e.toString();
@@ -109,15 +110,15 @@ const testVkToken = async () => {
   }
 };
 
-const oauthLinkAdmin = 'https://oauth.vk.com/authorize?client_id=6287487&display=page&redirect_uri=https://oauth.vk.com/blank.html&scope=friends,photos,audio,video,docs,notes,pages,status,wall,groups,messages,offline&response_type=token&v=5.131';
+const oauthLinkAdmin = 'https://dev.vk.com/ru/reference/overview';
 </script>
 
 <template>
   <div class="settings-page">
     <div class="page-header mb-6">
-      <h1>Настройки CRM & ИИ ASV Production</h1>
+      <h1>Настройки CRM & Scout ASV Production</h1>
       <p class="text-sm text-muted">
-        Встроенный Бесплатный ИИ зашит в программу по умолчанию. Настройте авторизацию VK для скаутинга.
+        VK API, параметры поиска и шаблоны. Секреты хранятся только в памяти текущей сессии.
       </p>
     </div>
 
@@ -134,25 +135,25 @@ const oauthLinkAdmin = 'https://oauth.vk.com/authorize?client_id=6287487&display
           <div class="instructions-box text-xs text-muted">
             <div class="flex flex-col gap-2">
               <button class="btn btn-purple btn-lg flex items-center justify-between font-bold" @click="openExternal(oauthLinkAdmin)">
-                <span>🔑 ПОЛУЧИТЬ ТОКЕН VK (VK ADMIN — 1 КЛИК)</span>
+                <span>🔑 ОФИЦИАЛЬНАЯ ДОКУМЕНТАЦИЯ VK API</span>
                 <LinkIcon :size="16" />
               </button>
               <p class="text-xs text-muted mt-1">
-                Нажмите синюю кнопку выше ➔ разрешите доступ ➔ скопируйте всю ссылку из браузера и вставьте в поле ниже:
+                Используйте токен собственного разрешённого VK-приложения. Проверка пользователя не гарантирует доступ к поиску и стенам.
               </p>
             </div>
           </div>
 
-          <div class="token-input-box">
+          <label class="text-xs">Тип токена<select v-model="store.tokenType"><option value="user">Пользовательский — Hot + Growth</option><option value="service">Сервисный — только поиск публикаций Hot</option></select></label><div class="token-input-box">
             <label class="block text-xs font-bold text-muted mb-1">Вставьте скопированную ссылку или access_token:</label>
             <div class="relative flex items-center mb-2">
-              <input 
-                v-model="rawInputToken" 
-                :type="showToken ? 'text' : 'password'" 
-                placeholder="https://oauth.vk.com/blank.html#access_token=..." 
+              <input
+                v-model="rawInputToken"
+                :type="showToken ? 'text' : 'password'"
+                placeholder="https://oauth.vk.com/blank.html#access_token=..."
                 style="padding-right: 40px;"
               />
-              <button 
+              <button
                 type="button"
                 class="eye-toggle-btn"
                 @click="showToken = !showToken"
@@ -186,21 +187,23 @@ const oauthLinkAdmin = 'https://oauth.vk.com/authorize?client_id=6287487&display
           <div class="flex items-center justify-between">
             <h2 class="flex items-center gap-2">
               <Sparkles color="var(--primary)" :size="20" />
-              2. ИИ-Движок (Автономный Бесплатный ИИ)
+              2. Движок Hot / Growth
             </h2>
             <span class="badge-ru flex items-center gap-1 text-xs">
-              <CheckCircle2 :size="12" /> Активен по умолчанию
+              <CheckCircle2 :size="12" /> Проверяемые источники
             </span>
           </div>
 
           <div class="instructions-box text-xs text-muted">
             <p>
-              В программу зашит постоянный бесплатный ИИ-движок (OpenRouter / Gemini 2.0 Flash). Отбор артистов, отсев чужих пабликов и генератор 3 вариантов оферов от вашей команды работают автоматически без покупки ключей!
+              Единые правила для веба и Tauri: оригинальные публикации, даты, авторство и музыкальная релевантность. Балл не является вероятностью заказа. Ошибка API не превращается в успешный результат.
             </p>
           </div>
         </div>
 
-        <button class="btn btn-primary btn-lg" @click="saveAll">
+        <div class="glass-card flex-col gap-3"><h2>Параметры поиска</h2><label class="text-xs">Направление<select v-model="store.mode"><option value="both">Hot + Growth</option><option value="hot">Hot — коммерческие запросы</option><option value="growth">Growth — музыкальная активность</option></select></label><label class="text-xs">Поисковых фраз<input v-model.number="store.maxQueries" type="number" min="1" max="8" /></label><label class="text-xs">Профилей на направление<input v-model.number="store.maxGroups" type="number" min="1" max="30" /></label><label class="text-xs">Дополнительные Hot-фразы<input v-model="store.extraKeywords" placeholder="нужен мастеринг, ищу аранжировщика" /></label>
+        <details><summary>API-сервер для веба</summary><p class="text-xs text-muted">Для GitHub Pages и браузерного CORS можно подключить собственный сервер. Он получит VK-токен на время запроса. Используйте только доверенный HTTPS-адрес.</p><label class="text-xs">Адрес сервера<input v-model="store.backendUrl" placeholder="https://scout-api.example.com" /></label><label class="text-xs">Ключ доступа сервера<input v-model="store.backendKey" type="password" autocomplete="off" /></label></details></div>
+        <button class="btn btn-primary btn-lg" :disabled="saving" @click="saveAll">
           <Save :size="18" />
           Сохранить все настройки
         </button>
@@ -214,7 +217,7 @@ const oauthLinkAdmin = 'https://oauth.vk.com/authorize?client_id=6287487&display
         </h2>
 
         <p class="text-xs text-muted mb-2">
-          Эти шаблоны подставляются в модуль скоринга и быстрого копирования предложением от имени ASV Production. 
+          Эти шаблоны подставляются в модуль скоринга и быстрого копирования предложением от имени ASV Production.
           Теги: <code>{name}</code> — название группы/артиста, <code>{genre}</code> — описание/жанр.
         </p>
 
@@ -226,17 +229,18 @@ const oauthLinkAdmin = 'https://oauth.vk.com/authorize?client_id=6287487&display
 
         <!-- Template 2: Arrangements -->
         <div class="template-editor-box mb-3">
-          <label class="text-xs font-bold text-primary block mb-1">2. Аранжировка и Продакшн (15 000 ₽)</label>
+          <label class="text-xs font-bold text-primary block mb-1">2. Инструментал / аранжировка (15 000 ₽)</label>
           <textarea v-model="arrangementTemplate" rows="4" class="text-xs"></textarea>
         </div>
 
         <!-- Template 3: Mastering -->
         <div class="template-editor-box mb-3">
-          <label class="text-xs font-bold text-primary block mb-1">3. Мастеринг под стриминги (5 000 ₽)</label>
+          <label class="text-xs font-bold text-primary block mb-1">3. Stem-мастеринг (5 000 ₽)</label>
           <textarea v-model="masteringTemplate" rows="4" class="text-xs"></textarea>
         </div>
 
-        <button class="btn btn-primary mt-auto" @click="saveAll">
+        <div class="template-editor-box mb-3"><label class="text-xs font-bold text-primary block mb-1">4. Музыкальный продакшн (от 35 000 ₽)</label><textarea v-model="productionTemplate" rows="4" class="text-xs"></textarea></div><div class="template-editor-box mb-3"><label class="text-xs font-bold text-primary block mb-1">5. Аудит материала (4 000 ₽)</label><textarea v-model="auditTemplate" rows="4" class="text-xs"></textarea></div>
+        <button class="btn btn-primary mt-auto" :disabled="saving" @click="saveAll">
           <Save :size="18" />
           Сохранить все шаблоны
         </button>
