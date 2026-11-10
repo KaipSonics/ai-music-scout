@@ -43,6 +43,7 @@ pub fn run() {
             scout_vk::scout_test_token,
             scout_vk::scout_get_owner,
             scout_db::scout_get_records,
+            scout_db::scout_get_snapshot,
             scout_db::scout_save_records,
             // DB - Artists
             commands_db::db_save_artist,

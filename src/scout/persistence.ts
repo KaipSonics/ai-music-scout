@@ -2,6 +2,7 @@ import {isTauri, safeInvoke} from '../utils/tauriBridge';
 import {candidateFromOwner,evaluateOpportunity,STATUS_LABEL,type Opportunity,type LeadStatus} from './opportunity';
 const KEY='asv_scout_v3_records';
 const MAX_RECORDS=2500;
+let nativeRevision=0;
 export interface ActivityEvent { at:string; type:'status'|'note'|'scan'|'followup'|'conversion'; text:string }
 export interface LeadRecord {
  profile?:{name?:string;description?:string;contacts?:string;music_links?:string};
@@ -30,9 +31,9 @@ function refreshed(r:LeadRecord):LeadRecord {
  current.signals=current.signals.map(s=>({...s,capturedAt:o.signals.find(x=>x.id===s.id)?.capturedAt||o.assessedAt}));
  return {...r,opportunity:current};
 }
-async function readRecords():Promise<LeadRecord[]> {
+async function readRecords(trackRevision=false):Promise<LeadRecord[]> {
  let data:unknown;
- if(isTauri())data=await safeInvoke<unknown>('scout_get_records');
+ if(isTauri()){const snapshot=await safeInvoke<{records:unknown;revision:number}>('scout_get_snapshot');if(!Number.isSafeInteger(snapshot?.revision))throw new Error('Некорректная ревизия SQLite');if(trackRevision)nativeRevision=snapshot.revision;data=snapshot.records;}
  else {try{data=JSON.parse(localStorage.getItem(KEY)||'[]');}catch{throw new Error('CRM повреждена. Данные не перезаписаны; восстановите JSON-экспорт.');}}
  if(!Array.isArray(data)||!data.every(validateRecord))throw new Error('Некорректная запись CRM. Автоматическая перезапись отключена. Восстановите экспорт.');
  return data;
@@ -41,7 +42,7 @@ export async function loadRecords():Promise<LeadRecord[]> {return (await readRec
 async function saveAll(records:LeadRecord[]):Promise<void> {
  if(records.length>MAX_RECORDS)throw new Error('Лимит CRM 2500 контактов. Существующие данные сохранены.');
  if(!records.every(validateRecord))throw new Error('Некорректные данные CRM');
- if(isTauri())await safeInvoke('scout_save_records',{records});
+ if(isTauri())await safeInvoke('scout_save_records',{records,expectedRevision:nativeRevision});
  else { const before=localStorage.getItem(KEY); if(before!==null)localStorage.setItem(KEY+'_backup',before);localStorage.setItem(KEY,JSON.stringify(records)); }
 }
 let pending:Promise<unknown>=Promise.resolve();
@@ -50,7 +51,7 @@ function mutate<T>(operation:()=>Promise<T>):Promise<T> {
  const next=pending.then(run,run);pending=next.catch(()=>{});return next;
 }
 export function mergeScan(found:Opportunity[]):Promise<LeadRecord[]> {return mutate(async()=>{
- const records=await readRecords(),byId=new Map(records.map(r=>[r.id,r]));
+ const records=await readRecords(true),byId=new Map(records.map(r=>[r.id,r]));
  for(const o of found){
    if(o.source==='demo')continue;
    const old=byId.get(o.id),at=new Date().toISOString();
@@ -62,7 +63,7 @@ export function mergeScan(found:Opportunity[]):Promise<LeadRecord[]> {return mut
  const next=[...byId.values()];await saveAll(next);return next.map(refreshed);
 });}
 export function updateRecord(id:string,changes:Partial<Pick<LeadRecord,'status'|'note'|'followUpAt'|'valueRub'>>):Promise<LeadRecord[]> {return mutate(async()=>{
- const rows=await readRecords(),i=rows.findIndex(r=>r.id===id);if(i<0)throw new Error('Лид не найден');
+ const rows=await readRecords(true),i=rows.findIndex(r=>r.id===id);if(i<0)throw new Error('Лид не найден');
  if(changes.status && !Object.hasOwn(STATUS_LABEL,changes.status))throw new Error('Некорректный статус');
  if(changes.valueRub!==undefined && (!Number.isFinite(changes.valueRub)||changes.valueRub<0))throw new Error('Некорректная сумма');
  if(changes.followUpAt && !/^\d{4}-\d{2}-\d{2}$/.test(changes.followUpAt))throw new Error('Некорректная дата');
@@ -75,18 +76,18 @@ export function updateRecord(id:string,changes:Partial<Pick<LeadRecord,'status'|
  rows[i]={...prev,...changes,contactedAt:prev.contactedAt||(['contacted','replied','negotiating','won'].includes(status||'')?at:undefined),repliedAt:prev.repliedAt||(['replied','negotiating','won'].includes(status||'')?at:undefined),negotiatingAt:prev.negotiatingAt||(status==='negotiating'?at:undefined),wonAt:prev.wonAt||(status==='won'?at:undefined),history:[...prev.history,...events]};
  await saveAll(rows);return rows.map(refreshed);
 });}
-export function removeRecord(id:string):Promise<LeadRecord[]> {return mutate(async()=>{const rows=(await readRecords()).filter(r=>r.id!==id);await saveAll(rows);return rows.map(refreshed);});}
+export function removeRecord(id:string):Promise<LeadRecord[]> {return mutate(async()=>{const rows=(await readRecords(true)).filter(r=>r.id!==id);await saveAll(rows);return rows.map(refreshed);});}
 export function exportRecords(records:LeadRecord[]):string {return JSON.stringify({format:'asv-scout-v3',exportedAt:new Date().toISOString(),records},null,2);}
 export function importRecords(json:string):Promise<{records:LeadRecord[];imported:number}> {return mutate(async()=>{
  let root;try{root=JSON.parse(json);}catch{throw new Error('Некорректный JSON');}
  if(root?.format!=='asv-scout-v3'||!Array.isArray(root.records)||!root.records.every(validateRecord))throw new Error('Некорректный экспорт Scout 3.0');
- const current=await readRecords(),byId=new Map(current.map(r=>[r.id,r]));let count=0;
+ const current=await readRecords(true),byId=new Map(current.map(r=>[r.id,r]));let count=0;
  // Existing entries win: import never erases notes/history/statuses recorded after export.
  for(const record of root.records)if(!byId.has(record.id)){byId.set(record.id,record);count++;}
  const records=[...byId.values()];await saveAll(records);return {records:records.map(refreshed),imported:count};
 });}
 export function importLegacyWeb():Promise<number> {return mutate(async()=>{
- const old=await safeInvoke<any[]>('db_get_artists'),existing=await readRecords(),byId=new Map(existing.map(r=>[r.id,r]));let count=0;
+ const old=await safeInvoke<any[]>('db_get_artists'),existing=await readRecords(true),byId=new Map(existing.map(r=>[r.id,r]));let count=0;
  const statuses:Record<string,LeadStatus>={'Новый':'new','Изучен':'reviewed','Написали':'contacted','Ответил':'replied','Клиент':'won','Не актуален':'lost','Избранное':'favorite','new':'new'};
  for(const a of old){
    // Legacy vk_id is positive for both users and groups. Use the saved URL/raw type, never guess.
@@ -111,10 +112,10 @@ export function summarize(records:LeadRecord[]){
 }
 
 export function updateProfile(id:string,changes:{name?:string;description?:string;contacts?:string;music_links?:string}):Promise<void>{return mutate(async()=>{
- const rows=await readRecords(),row=rows.find(r=>r.id===id);if(!row)throw new Error('Лид не найден');
+ const rows=await readRecords(true),row=rows.find(r=>r.id===id);if(!row)throw new Error('Лид не найден');
  if(changes.name!==undefined){if(!changes.name.trim())throw new Error('Укажите имя артиста');changes.name=changes.name.trim().slice(0,200);}
  if(changes.description!==undefined)changes.description=changes.description.slice(0,10000);
  row.profile={...row.profile,...changes};row.history.push({at:new Date().toISOString(),type:'note',text:'Обновлена карточка артиста'});await saveAll(rows);
 });}
-export function addRecordEvent(id:string,text:string):Promise<void>{return mutate(async()=>{const rows=await readRecords(),row=rows.find(r=>r.id===id);if(!row)throw new Error('Лид не найден');row.history.push({at:new Date().toISOString(),type:'note',text:text.slice(0,10000)});await saveAll(rows);});}
-export function reconcileScan(found:Opportunity[]):Promise<void>{return mutate(async()=>{const rows=await readRecords();const checked=new Map(found.map(o=>[o.id,o]));for(const r of rows){const o=checked.get(r.id);if(o){r.opportunity=o;r.lastSeen=new Date().toISOString();}}await saveAll(rows);});}
+export function addRecordEvent(id:string,text:string):Promise<void>{return mutate(async()=>{const rows=await readRecords(true),row=rows.find(r=>r.id===id);if(!row)throw new Error('Лид не найден');row.history.push({at:new Date().toISOString(),type:'note',text:text.slice(0,10000)});await saveAll(rows);});}
+export function reconcileScan(found:Opportunity[]):Promise<void>{return mutate(async()=>{const rows=await readRecords(true);const checked=new Map(found.map(o=>[o.id,o]));let changed=false;for(const r of rows){const o=checked.get(r.id);if(o){r.opportunity=o;r.lastSeen=new Date().toISOString();changed=true;}}if(changed)await saveAll(rows);});}

@@ -54,7 +54,7 @@ function openExisting(id:string){router.push('/artist/'+encodeURIComponent(id));
     </div>
 
     <div class="glass-card mb-4 flex items-center gap-3 search-controls">
-      <input v-model="searchStore.userSearchQuery" placeholder="Жанры или проекты через запятую" aria-label="Жанры или проекты" :disabled="searchStore.isSearching" />
+      <input class="glass-input" v-model="searchStore.userSearchQuery" placeholder="Жанры или проекты через запятую" aria-label="Жанры или проекты" :disabled="searchStore.isSearching" />
       <select v-model="searchStore.filter" aria-label="Фильтр возможностей"><option value="all">Hot + Growth</option><option value="hot">Hot — актуальный запрос</option><option value="growth">Growth — развитие</option></select>
       <button class="btn btn-secondary" :disabled="searchStore.isSearching" @click="searchStore.showDemo">{{searchStore.demo?'Закрыть демо':'Демо'}}</button>
       <button v-if="searchStore.isSearching" class="btn btn-danger" @click="searchStore.cancel">Отменить поиск</button>
@@ -420,5 +420,6 @@ function openExisting(id:string){router.push('/artist/'+encodeURIComponent(id));
   background: rgba(18, 14, 38, 0.95);
   border: 1px solid rgba(157, 78, 221, 0.4);
 }
-.search-controls{flex-wrap:wrap}.search-controls input{flex:1;min-width:190px}.search-controls select{width:auto}.evidence-panel{padding:12px;border:1px solid var(--glass-border);border-radius:8px;line-height:1.6;overflow-wrap:anywhere}@media(max-width:768px){.scout-input-card>.flex,.card-main>.flex{flex-wrap:wrap;gap:12px}.search-controls>*{width:100%}.scout-start-btn{width:100%}.modal-content{max-height:85vh;overflow:auto}.modal-content .flex{flex-wrap:wrap}}
+.search-controls{flex-wrap:wrap}.search-controls input{flex:1;min-width:190px}.search-controls select{width:auto}.evidence-panel{padding:12px;border:1px solid var(--glass-border);border-radius:8px;line-height:1.6;overflow-wrap:anywhere}@media(max-width:768px){.scout-input-card>.flex,.card-main>.flex{flex-wrap:wrap;gap:12px}.search-controls input{flex:1 1 100%;width:100%}.search-controls select,.search-controls>.btn{flex:1;min-width:0;width:auto}.scout-start-btn{width:100%}.modal-content{max-height:85vh;overflow:auto}.modal-content .flex{flex-wrap:wrap}}
+.vk-link{color:var(--primary);text-decoration:none}.search-controls input{padding:12px;min-height:44px}
 </style>

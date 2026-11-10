@@ -16,7 +16,8 @@ test('original navigation, isolated demo, evidence, three editable drafts',async
  expect(await page.evaluate(()=>localStorage.getItem('asv_scout_v3_records'))).toBeNull();await expect(page.getByRole('button',{name:'В CRM',exact:true}).first()).toBeDisabled();
  await page.getByRole('button',{name:'Публикации и оценка'}).first().click();await expect(page.locator('.evidence-panel').first()).toContainText('не является вероятностью');
  await page.getByRole('button',{name:'Сообщение',exact:true}).first().click();const draft=page.getByRole('textbox',{name:'Текст обращения'});expect(await draft.inputValue()).not.toMatch(/послуш/);await draft.fill('Мой черновик');await page.getByRole('button',{name:'Закрыть',exact:true}).click();
- await page.goto('./#/crm');await expect(page.locator('.kanban-board')).toBeVisible();await page.getByRole('button',{name:/Список/}).click();await expect(page.locator('.crm-page')).toContainText('CRM пока пуста');await page.getByRole('button',{name:'Доска',exact:true}).click();
+ await page.goto('./#/crm');await expect(page.locator('.kanban-board')).toBeVisible();
+ for(const label of ['ИМПОРТ','ЭКСПОРТ']){const box=await page.getByRole('button',{name:label,exact:true}).boundingBox();expect(box&&box.x>=0&&box.x+box.width<=page.viewportSize()!.width).toBeTruthy();}await page.getByRole('button',{name:/Список/}).click();await expect(page.locator('.crm-page')).toContainText('CRM пока пуста');await page.getByRole('button',{name:'Доска',exact:true}).click();
  await page.goto('./#/settings');await expect(page.getByPlaceholder('https://oauth.vk.com/blank.html#access_token=...')).toHaveAttribute('type','password');expect(errors).toEqual([]);
 });
 test('MOCK VK full flow: search → evidence → CRM → manual contact → paid order → reload/export',async({page})=>{

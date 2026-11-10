@@ -434,4 +434,5 @@ const getVkMeUrl = (link: string) => {
   background: var(--primary);
   color: #07060f;
 }
+@media(max-width:768px){.crm-header{flex-direction:column;align-items:stretch;gap:16px}.crm-header>.flex{flex-wrap:wrap;gap:8px}.crm-header .search-box{width:100%}.kanban-board{max-width:100%;overflow-x:auto}}
 </style>
