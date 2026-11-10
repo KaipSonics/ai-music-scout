@@ -54,7 +54,7 @@ function openExisting(id:string){router.push('/artist/'+encodeURIComponent(id));
     </div>
 
     <div class="glass-card mb-4 flex items-center gap-3 search-controls">
-      <input class="glass-input" v-model="searchStore.userSearchQuery" placeholder="Жанры или проекты через запятую" aria-label="Жанры или проекты" :disabled="searchStore.isSearching" />
+      <input type="text" class="glass-input" v-model="searchStore.userSearchQuery" placeholder="Жанры или проекты через запятую" aria-label="Жанры или проекты" :disabled="searchStore.isSearching" />
       <select v-model="searchStore.filter" aria-label="Фильтр возможностей"><option value="all">Hot + Growth</option><option value="hot">Hot — актуальный запрос</option><option value="growth">Growth — развитие</option></select>
       <button class="btn btn-secondary" :disabled="searchStore.isSearching" @click="searchStore.showDemo">{{searchStore.demo?'Закрыть демо':'Демо'}}</button>
       <button v-if="searchStore.isSearching" class="btn btn-danger" @click="searchStore.cancel">Отменить поиск</button>
