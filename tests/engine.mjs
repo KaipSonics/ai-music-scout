@@ -13,7 +13,7 @@ test('cancel aborts in-flight transport and prevents overlapping scan',async()=>
  }finally{globalThis.fetch=prior;}
 });
 test('unsupported newsfeed falls back to official community walls with visible diagnostic',async()=>{
- const prior=fetch;globalThis.fetch=async url=>new Response(JSON.stringify(url.endsWith('newsfeed.search')?{error:{error_code:15}}:url.endsWith('groups.getById')?{response:[{id:42,name:'Артист',description:'Музыкант'}]}:url.endsWith('groups.search')?{response:{items:[{id:42,name:'Артист',description:'Музыкант'}]}}:{response:{items:[post]}}));
+ const prior=fetch;globalThis.fetch=async url=>new Response(JSON.stringify(new URL(url).pathname.endsWith('newsfeed.search')?{error:{error_code:15}}:new URL(url).pathname.endsWith('groups.getById')?{response:[{id:42,name:'Артист',description:'Музыкант'}]}:new URL(url).pathname.endsWith('groups.search')?{response:{items:[{id:42,name:'Артист',description:'Музыкант'}]}}:{response:{items:[post]}}));
  try{const result=await discover({token:'test-placeholder',mode:'hot',maxQueries:1,maxGroups:1});assert.equal(result.opportunities[0].kind,'hot');assert.equal(result.stats.failures.length,1);assert.equal(result.stats.checkedGroups,1);}finally{globalThis.fetch=prior;}
 });
 test('backend client keeps secrets in session, uses configured endpoint and generic diagnostics',async()=>{

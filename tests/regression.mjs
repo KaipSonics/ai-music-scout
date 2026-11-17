@@ -66,8 +66,8 @@ test('VK invalid token, rate limit, network, malformed JSON and empty results',a
   globalThis.fetch=async()=>new Response(JSON.stringify({response:{items:'bad'}}));await assert.rejects(vk.searchPosts('test','test-placeholder',0),/некорректный/);
  }finally{globalThis.fetch=original;}
 });
-test('VK uses bounded deterministic queries with token only in POST body',async()=>{
- const original=fetch;let calls=0;globalThis.fetch=async(url,init)=>{calls++;assert(!url.includes('access_token'));assert.equal(init.method,'POST');assert.equal(init.body.get('access_token'),'test-placeholder');return new Response(JSON.stringify({response:url.endsWith('groups.getById')?[{id:42,name:'Artist',description:'Независимый музыкант'}]:{items:[p()],groups:[{id:42,name:'Artist',description:'Независимый музыкант'}]}}));};
+test('VK uses bounded deterministic direct GET queries',async()=>{
+ const original=fetch;let calls=0;globalThis.fetch=async(url,init)=>{calls++;assert.equal(init.method,'GET');assert.equal(new URL(url).searchParams.get('access_token'),'test-placeholder');return new Response(JSON.stringify({response:new URL(url).pathname.endsWith('groups.getById')?[{id:42,name:'Artist',description:'Независимый музыкант'}]:{items:[p()],groups:[{id:42,name:'Artist',description:'Независимый музыкант'}]}}));};
  try{const report=await discover({token:'test-placeholder',mode:'hot',maxQueries:1});assert.equal(calls,2);assert.equal(report.opportunities.length,1);}finally{globalThis.fetch=original;}
 });
 test('desktop VK adapter preserves signed owner ID and explicit rate-limit failure',async()=>{
