@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - release/scout-pages-20261118
   workflow_dispatch:
 
 permissions:
