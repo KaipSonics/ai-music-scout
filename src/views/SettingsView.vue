@@ -110,7 +110,8 @@ const testVkToken = async () => {
   }
 };
 
-const oauthLinkAdmin = 'https://dev.vk.com/ru/reference/overview';
+// Previously available VK OAuth entry point; only request scopes used for discovery.
+const oauthLinkAdmin = 'https://oauth.vk.com/authorize?client_id=6287487&display=page&redirect_uri=https%3A%2F%2Foauth.vk.com%2Fblank.html&scope=wall%2Cgroups&response_type=token&v=5.131';
 </script>
 
 <template>
@@ -135,11 +136,11 @@ const oauthLinkAdmin = 'https://dev.vk.com/ru/reference/overview';
           <div class="instructions-box text-xs text-muted">
             <div class="flex flex-col gap-2">
               <button class="btn btn-purple btn-lg flex items-center justify-between font-bold" @click="openExternal(oauthLinkAdmin)">
-                <span>🔑 ОФИЦИАЛЬНАЯ ДОКУМЕНТАЦИЯ VK API</span>
+                <span>🔑 ПОЛУЧИТЬ ТОКЕН VK</span>
                 <LinkIcon :size="16" />
               </button>
               <p class="text-xs text-muted mt-1">
-                Используйте токен собственного разрешённого VK-приложения. Проверка пользователя не гарантирует доступ к поиску и стенам.
+                Откройте авторизацию VK, подтвердите права и вставьте сюда адрес открывшейся страницы. Не пересылайте эту ссылку: она содержит токен. Способ использует приложение VK с ID 6287487; доступность и права определяет VK.
               </p>
             </div>
           </div>

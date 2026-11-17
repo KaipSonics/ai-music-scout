@@ -4,7 +4,7 @@ export const isTauri = () => typeof window !== 'undefined' && '__TAURI_INTERNALS
 export async function openExternal(url:string):Promise<void> {
   let parsed: URL;
   try { parsed=new URL(url); } catch {throw new Error('Некорректная ссылка');}
-  if(parsed.protocol!=='https:' || !['vk.com','m.vk.com','vk.ru','vk.me','dev.vk.com'].includes(parsed.hostname) || parsed.username || parsed.password) throw new Error('Разрешены HTTPS-ссылки VK');
+  if(parsed.protocol!=='https:' || !(['vk.com','m.vk.com','vk.ru','vk.me','dev.vk.com'].includes(parsed.hostname) || (parsed.hostname==='oauth.vk.com' && parsed.pathname==='/authorize')) || parsed.username || parsed.password) throw new Error('Разрешены HTTPS-ссылки VK');
   if(isTauri()) await tauriInvoke('open_url',{url:parsed.href});
   else window.open(parsed.href,'_blank','noopener,noreferrer');
 }
