@@ -21,7 +21,6 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npm audit --audit-level=high
       - run: npm test
       - run: npm run typecheck
       - run: npm run build
@@ -33,6 +32,8 @@ jobs:
         with:
           name: scout-ui-results
           path: test-results/
+      # Keep browser evidence available even when a newly disclosed advisory fails audit.
+      - run: npm audit --audit-level=high
   tauri:
     timeout-minutes: 25
     runs-on: ubuntu-24.04
