@@ -131,7 +131,7 @@ function openExisting(id:string){router.push('/artist/'+encodeURIComponent(id));
             <!-- ULTRA-AESTHETIC SINGLE SENTENCE AI HIGHLIGHT -->
             <div class="ai-punchline-box text-xs mb-2 flex items-center gap-2">
               <span class="ai-sparkle-pill flex items-center gap-1 font-bold">
-                <Sparkles :size="13" color="#53f6e4" />
+                <Sparkles :size="13" color="#2EC4B6" />
                 <span>Сигнал:</span>
               </span>
               <span class="punchline-text text-muted font-medium">
@@ -260,26 +260,26 @@ function openExisting(id:string){router.push('/artist/'+encodeURIComponent(id));
 }
 
 .scout-input-card {
-  background: rgba(18, 14, 38, 0.8);
-  border: 1px solid rgba(157, 78, 221, 0.3);
+  background: rgba(19, 27, 28, 0.8);
+  border: 1px solid rgba(46, 196, 182, 0.3);
   padding: 20px 24px;
 }
 
 .scout-start-btn {
   min-width: 220px;
-  box-shadow: 0 4px 18px rgba(157, 78, 221, 0.4);
+  box-shadow: 0 4px 18px rgba(46, 196, 182, 0.4);
   font-size: 1.05rem;
 }
 
 .stepper-card {
-  background: rgba(12, 10, 26, 0.9);
-  border: 1px solid rgba(98, 225, 216, 0.3);
+  background: rgba(12, 20, 21, 0.9);
+  border: 1px solid rgba(46, 196, 182, 0.3);
 }
 
 .spinner-ring {
   width: 20px;
   height: 20px;
-  border: 2px solid rgba(98, 225, 216, 0.2);
+  border: 2px solid rgba(46, 196, 182, 0.2);
   border-top-color: var(--primary);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
@@ -296,8 +296,8 @@ function openExisting(id:string){router.push('/artist/'+encodeURIComponent(id));
 }
 
 .high-score-card {
-  border-color: rgba(157, 78, 221, 0.4);
-  background: rgba(28, 20, 48, 0.8);
+  border-color: rgba(46, 196, 182, 0.4);
+  background: rgba(20, 38, 37, 0.8);
 }
 
 .avatar-v2 {
@@ -347,16 +347,16 @@ function openExisting(id:string){router.push('/artist/'+encodeURIComponent(id));
 }
 
 .ai-punchline-box {
-  background: rgba(10, 8, 24, 0.7);
-  border: 1px solid rgba(83, 246, 228, 0.25);
+  background: rgba(9, 16, 17, 0.7);
+  border: 1px solid rgba(46, 196, 182, 0.25);
   border-radius: 8px;
   padding: 8px 12px;
   backdrop-filter: blur(8px);
 }
 
 .ai-sparkle-pill {
-  background: rgba(83, 246, 228, 0.12);
-  color: #53f6e4;
+  background: rgba(46, 196, 182, 0.12);
+  color: #2EC4B6;
   padding: 2px 8px;
   border-radius: 12px;
   white-space: nowrap;
@@ -368,8 +368,8 @@ function openExisting(id:string){router.push('/artist/'+encodeURIComponent(id));
 }
 
 .asv-reason-box {
-  background: rgba(157, 78, 221, 0.1);
-  border-left: 3px solid #c084fc;
+  background: rgba(46, 196, 182, 0.1);
+  border-left: 3px solid #2EC4B6;
   padding: 6px 12px;
   border-radius: 0 8px 8px 0;
 }
@@ -417,8 +417,8 @@ function openExisting(id:string){router.push('/artist/'+encodeURIComponent(id));
 .modal-content {
   width: 90%;
   max-width: 640px;
-  background: rgba(18, 14, 38, 0.95);
-  border: 1px solid rgba(157, 78, 221, 0.4);
+  background: rgba(19, 27, 28, 0.95);
+  border: 1px solid rgba(46, 196, 182, 0.4);
 }
 .search-controls{flex-wrap:wrap}.search-controls input{flex:1;min-width:190px}.search-controls select{width:auto}.evidence-panel{padding:12px;border:1px solid var(--glass-border);border-radius:8px;line-height:1.6;overflow-wrap:anywhere}@media(max-width:768px){.scout-input-card>.flex,.card-main>.flex{flex-wrap:wrap;gap:12px}.search-controls input{flex:1 1 100%;width:100%}.search-controls select,.search-controls>.btn{flex:1;min-width:0;width:auto}.scout-start-btn{width:100%}.modal-content{max-height:85vh;overflow:auto}.modal-content .flex{flex-wrap:wrap}}
 .vk-link{color:var(--primary);text-decoration:none}.search-controls input{padding:12px;min-height:44px}

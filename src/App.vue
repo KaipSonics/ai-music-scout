@@ -97,6 +97,7 @@ watch(() => route.path, () => {
 
     <!-- Main Workspace -->
     <main class="main-content">
+      <div class="mobile-brand" aria-label="ASV Production"><span class="mobile-brand-asv">ASV</span><span class="mobile-brand-production">PRODUCTION</span></div>
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
           <component :is="Component" />
@@ -144,8 +145,8 @@ watch(() => route.path, () => {
 }
 
 .lock-box {
-  background: rgba(18, 14, 38, 0.9);
-  border: 1px solid rgba(157, 78, 221, 0.4);
+  background: rgba(19, 27, 28, 0.9);
+  border: 1px solid rgba(46, 196, 182, 0.4);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.8);
 }
 
@@ -153,8 +154,8 @@ watch(() => route.path, () => {
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: rgba(83, 246, 228, 0.15);
-  border: 1px solid rgba(83, 246, 228, 0.4);
+  background: rgba(46, 196, 182, 0.15);
+  border: 1px solid rgba(46, 196, 182, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -177,11 +178,11 @@ watch(() => route.path, () => {
 .asv-dune-title {
   font-family: 'Dune Rise', sans-serif;
   font-size: 2.8rem;
-  color: #53f6e4;
+  color: #2EC4B6;
   line-height: 1;
   letter-spacing: 0.22em;
   text-indent: 0.22em;
-  text-shadow: 0 0 16px rgba(83, 246, 228, 0.65), 0 0 32px rgba(83, 246, 228, 0.35);
+  text-shadow: 0 0 16px rgba(46, 196, 182, 0.65), 0 0 32px rgba(46, 196, 182, 0.35);
   margin-bottom: 2px;
 }
 
@@ -196,7 +197,7 @@ watch(() => route.path, () => {
 }
 
 .token-status-card {
-  background: rgba(15, 12, 28, 0.6);
+  background: rgba(14, 23, 24, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.06);
   padding: 10px 14px;
   border-radius: var(--radius-sm);
@@ -233,13 +234,13 @@ watch(() => route.path, () => {
 }
 
 .nav-link.active {
-  background: rgba(98, 225, 216, 0.12);
+  background: rgba(46, 196, 182, 0.12);
   color: var(--primary);
   border-left: 3px solid var(--primary);
 }
 
 .nav-badge {
-  background: rgba(98, 225, 216, 0.2);
+  background: rgba(46, 196, 182, 0.2);
   color: var(--primary);
   padding: 2px 8px;
   border-radius: 12px;
@@ -254,14 +255,14 @@ watch(() => route.path, () => {
   text-align: center;
 }
 
-.mobile-bottom-nav {
-  display: none;
-}
+.mobile-brand { display: none; }
+.mobile-bottom-nav { display: none; }
 
 @media (max-width: 768px) {
-  .sidebar {
-    display: none;
-  }
+  .sidebar { display: none; }
+  .mobile-brand { display: flex; align-items: baseline; gap: 12px; padding-bottom: 18px; margin-bottom: 22px; border-bottom: 1px solid rgba(46,196,182,.2); }
+  .mobile-brand-asv { font-family: 'Dune Rise', sans-serif; color: var(--primary); font-size: 1.55rem; letter-spacing: .16em; text-shadow: 0 0 14px rgba(46,196,182,.35); }
+  .mobile-brand-production { font-family: 'Syncopate', sans-serif; color: #eaf7f5; font-size: .52rem; letter-spacing: .12em; }
 
   .mobile-bottom-nav {
     display: flex;
@@ -269,9 +270,9 @@ watch(() => route.path, () => {
     bottom: 0;
     left: 0;
     right: 0;
-    background: rgba(18, 14, 38, 0.95);
+    background: rgba(19, 27, 28, 0.95);
     backdrop-filter: blur(16px);
-    border-top: 1px solid rgba(157, 78, 221, 0.3);
+    border-top: 1px solid rgba(46, 196, 182, 0.3);
     padding: 10px 16px;
     padding-bottom: calc(10px + env(safe-area-inset-bottom));
     justify-content: space-around;

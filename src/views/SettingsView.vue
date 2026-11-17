@@ -264,19 +264,19 @@ const oauthLinkAdmin = 'https://dev.vk.com/ru/reference/overview';
 }
 
 .highlight-vk-box {
-  border-color: rgba(157, 78, 221, 0.4);
-  background: rgba(26, 18, 50, 0.8);
+  border-color: rgba(46, 196, 182, 0.4);
+  background: rgba(20, 33, 33, 0.8);
 }
 
 .highlight-ai-box {
-  border-color: rgba(98, 225, 216, 0.3);
-  background: rgba(14, 22, 38, 0.7);
+  border-color: rgba(46, 196, 182, 0.3);
+  background: rgba(18, 30, 30, 0.7);
 }
 
 .badge-ru {
-  background: rgba(98, 225, 216, 0.2);
+  background: rgba(46, 196, 182, 0.2);
   color: var(--primary);
-  border: 1px solid rgba(98, 225, 216, 0.4);
+  border: 1px solid rgba(46, 196, 182, 0.4);
   padding: 2px 8px;
   border-radius: 12px;
   font-weight: 700;

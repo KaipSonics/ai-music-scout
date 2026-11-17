@@ -391,9 +391,9 @@ const goBack = () => {
 }
 
 .status-select-v2 {
-  background: rgba(18, 14, 38, 0.9);
+  background: rgba(19, 27, 28, 0.9);
   color: var(--primary);
-  border: 1px solid rgba(83, 246, 228, 0.4);
+  border: 1px solid rgba(46, 196, 182, 0.4);
   border-radius: var(--radius-sm);
   padding: 8px 14px;
   font-weight: 700;
@@ -403,19 +403,19 @@ const goBack = () => {
   outline: none;
 }
 .status-select-v2 option {
-  background: #0f0c1c;
+  background: #10191a;
   color: #ffffff;
 }
 
 .ai-eval-box {
-  background: rgba(157, 78, 221, 0.12);
-  border: 1px solid rgba(157, 78, 221, 0.35);
+  background: rgba(46, 196, 182, 0.12);
+  border: 1px solid rgba(46, 196, 182, 0.35);
   padding: 14px 18px;
   border-radius: var(--radius-md);
 }
 
 .stat-box {
-  background: rgba(10, 8, 24, 0.6);
+  background: rgba(9, 16, 17, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.08);
   padding: 10px 14px;
   border-radius: 8px;

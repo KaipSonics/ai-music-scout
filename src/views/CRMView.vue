@@ -317,8 +317,8 @@ const getVkMeUrl = (link: string) => {
 
 .kanban-col {
   flex: 0 0 280px;
-  background: rgba(14, 11, 26, 0.6);
-  border: 1px solid rgba(98, 225, 216, 0.12);
+  background: rgba(15, 23, 24, 0.6);
+  border: 1px solid rgba(46, 196, 182, 0.12);
   border-radius: var(--radius-lg);
   padding: 12px;
   display: flex;
