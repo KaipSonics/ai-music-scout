@@ -53,7 +53,7 @@ for(const route of ['search','crm','settings'])test('visual comparison original 
 });
 
 test('VK authorization button opens original OAuth endpoint with limited scopes',async({page})=>{
- await page.route('https://oauth.vk.com/authorize**',route=>route.fulfill({body:'VK OAuth test',contentType:'text/plain'}));
+ await page.context().route('https://oauth.vk.com/authorize**',route=>route.fulfill({body:'VK OAuth test',contentType:'text/plain'}));
  await page.goto('./#/settings');
  const wait=page.waitForEvent('popup');await page.getByRole('button',{name:'🔑 ПОЛУЧИТЬ ТОКЕН VK'}).click();
  const popup=await wait;await popup.waitForLoadState();const u=new URL(popup.url());
