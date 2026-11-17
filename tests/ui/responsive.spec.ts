@@ -14,6 +14,7 @@ test('navigation and controls fit narrow, tablet and desktop screens', async ({ 
         await page.getByRole('button', { name: 'Демо', exact: true }).click();
         await expect(page.locator('.candidate-card-v2').first()).toBeVisible();
         await expect.poll(() => main.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBeTruthy();
+        await page.getByRole('button', { name: 'Закрыть демо', exact: true }).click();
       }
       if (route === 'settings') await expect(page.getByRole('button', { name: 'Сохранить все настройки', exact: true })).toBeVisible();
     }
