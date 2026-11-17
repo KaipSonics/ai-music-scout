@@ -2,7 +2,7 @@ import {test,expect,type Page} from '@playwright/test';
 async function mockVK(page:Page,options:{error?:number;empty?:boolean;slow?:boolean}={}){
  await page.route('https://api.vk.com/method/**',async route=>{
   if(options.slow)await new Promise(r=>setTimeout(r,2000));
-  const method=new URL(route.request().url()).pathname.split('/').pop();const body=new URLSearchParams(route.request().postData()||'');
+  const method=new URL(route.request().url()).pathname.split('/').pop();const body=route.request().method()==='GET'?new URL(route.request().url()).searchParams:new URLSearchParams(route.request().postData()||'');
   const owner=Number(body.get('group_ids')||body.get('owner_id')||42),id=Math.abs(owner);
   const profile={id,name:id===84?'Growth Artist':'Hot Artist',description:'Независимый музыкальный артист',members_count:1200,screen_name:'artist'+id};
   const post={id:101,owner_id:owner>0?-owner:owner,from_id:owner>0?-owner:owner,date:Math.floor(Date.now()/1000)-86400,text:id===84?'Записываем новый альбом':'Ищу звукорежиссера для сведения нового трека'};

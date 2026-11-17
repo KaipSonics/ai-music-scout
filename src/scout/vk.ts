@@ -17,7 +17,7 @@ async function webCall(method:string,params:Record<string,string|number>,token:s
   const body=new URLSearchParams();
   for(const [key,value] of Object.entries({...params,access_token:cleanToken(token),v:API_VERSION})) body.set(key,String(value));
   let response:Response;
-  try{response=await fetch(backend.url?backend.url+'/api/vk/'+method:endpoint+method,{method:'POST',body,headers:backend.url?{Authorization:'Bearer '+backend.key}:{},cache:'no-store',referrerPolicy:'no-referrer',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(16000)]):AbortSignal.timeout(16000)});}
+  try{response=await fetch(backend.url?backend.url+'/api/vk/'+method:endpoint+method+'?'+body.toString(),{method:backend.url?'POST':'GET',...(backend.url?{body,headers:{Authorization:'Bearer '+backend.key}}:{}),cache:'no-store',referrerPolicy:'no-referrer',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(16000)]):AbortSignal.timeout(16000)});}
   catch{aborted(signal);throw new Error(`VK ${method}: сеть, таймаут или CORS. Для веба настройте API-сервер, для desktop используйте Tauri.`)}
   if(!response.ok){if(backend.url)throw new Error(`API-сервер: ${response.status===401?'неверный ключ доступа':response.status===403?'источник запроса не разрешён':response.status===429?'лимит запросов; повторите позже':'VK недоступен или некорректный ответ'} (HTTP ${response.status})`);throw new Error(`VK ${method}: HTTP ${response.status}`);}
   let result;try{result=await response.json();}catch{throw new Error(`VK ${method}: некорректный JSON`)}
