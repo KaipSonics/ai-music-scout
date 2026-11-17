@@ -52,7 +52,7 @@ pub async fn vk_newsfeed_search_v3(query:String,start_time:i64,extended:u8,count
 }
 #[tauri::command]
 pub fn open_url(url:String)->Result<(),String>{
-    if !(url.starts_with("https://vk.com/")||url.starts_with("https://m.vk.com/")||url.starts_with("https://vk.ru/")||url.starts_with("https://vk.me/")||url.starts_with("https://dev.vk.com/")) || url.chars().any(|c|c.is_control()||c==' '){
+    if !(url.starts_with("https://vk.com/")||url.starts_with("https://m.vk.com/")||url.starts_with("https://vk.ru/")||url.starts_with("https://vk.me/")||url.starts_with("https://dev.vk.com/")||url.starts_with("https://oauth.vk.com/authorize?")) || url.chars().any(|c|c.is_control()||c==' '){
         return Err("Разрешены только HTTPS-ссылки VK".into());
     }
     #[cfg(target_os="macos")]

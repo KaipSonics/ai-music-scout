@@ -51,3 +51,13 @@ for(const route of ['search','crm','settings'])test('visual comparison original 
  if(route==='search'){await page.getByRole('button',{name:'Демо',exact:true}).click();await page.screenshot({path:`test-results/final-results-${info.project.name}.png`,fullPage:true});}
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
 });
+
+test('VK authorization button opens original OAuth endpoint with limited scopes',async({page})=>{
+ await page.route('https://oauth.vk.com/authorize**',route=>route.fulfill({body:'VK OAuth test',contentType:'text/plain'}));
+ await page.goto('./#/settings');
+ const wait=page.waitForEvent('popup');await page.getByRole('button',{name:'🔑 ПОЛУЧИТЬ ТОКЕН VK'}).click();
+ const popup=await wait;await popup.waitForLoadState();const u=new URL(popup.url());
+ expect(u.origin).toBe('https://oauth.vk.com');expect(u.pathname).toBe('/authorize');
+ expect(u.searchParams.get('client_id')).toBe('6287487');expect(u.searchParams.get('scope')).toBe('wall,groups');
+ await popup.close();
+});
