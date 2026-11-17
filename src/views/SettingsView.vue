@@ -252,15 +252,17 @@ const oauthLinkAdmin = 'https://dev.vk.com/ru/reference/overview';
 <style scoped>
 .settings-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 24px;
 }
 
 @media (max-width: 768px) {
   .settings-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: 16px;
   }
+  .highlight-ai-box > .flex { flex-wrap: wrap; gap: 10px; }
+  .instructions-box .btn { white-space: normal; overflow-wrap: anywhere; }
 }
 
 .highlight-vk-box {

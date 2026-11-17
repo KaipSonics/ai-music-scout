@@ -365,7 +365,7 @@ const goBack = () => {
 <style scoped>
 .artist-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 20px;
 }
 
@@ -423,7 +423,7 @@ const goBack = () => {
 
 .grid-2 {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 }
-@media(max-width:768px){.top-nav,.top-nav>.flex,.offer-copier-container>.flex,.offer-copier-container .flex{flex-wrap:wrap;gap:10px}.header-name{overflow-wrap:anywhere}.artist-page{min-width:0}}
+@media(max-width:768px){.top-nav,.top-nav>.flex,.offer-copier-container>.flex,.offer-copier-container .flex{flex-wrap:wrap;gap:10px}.header-name{overflow-wrap:anywhere}.artist-page{min-width:0}.grid-2{grid-template-columns:minmax(0,1fr)}}
 </style>
