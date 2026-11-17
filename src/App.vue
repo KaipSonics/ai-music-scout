@@ -1,31 +1,16 @@
 <script setup lang="ts">
 import { onMounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
-import { Settings, Search, Users, CheckCircle2, AlertCircle, Lock, KeyRound, AlertTriangle } from '@lucide/vue';
+import { Settings, Search, Users, CheckCircle2, AlertCircle, AlertTriangle } from '@lucide/vue';
 import { useSettingsStore } from './stores/settings';
 import { useToast } from './composables/useToast';
-import { safeInvoke, isTauri } from './utils/tauriBridge';
+import { crmInvoke as safeInvoke } from './scout/crm';
 
 const route = useRoute();
 const settingsStore = useSettingsStore();
-const { toasts, show } = useToast();
+const { toasts,show } = useToast();
 
 const artistCount = ref(0);
-
-// PIN Security Lock for Web/PWA deployment (PIN: 1607)
-const isUnlocked = ref(true);
-const inputPin = ref('');
-const pinError = ref('');
-
-const checkPin = () => {
-  if (inputPin.value.trim() === '1607' || inputPin.value.trim() === 'asv') {
-    localStorage.setItem('asv_pwa_unlocked', 'true');
-    isUnlocked.value = true;
-    show('Доступ разрешен!', 'success');
-  } else {
-    pinError.value = 'Неверный пин-код доступа ASV';
-  }
-};
 
 const navItems = [
   { name: 'Поиск', path: '/search', icon: Search },
@@ -45,10 +30,7 @@ const updateStats = async () => {
 };
 
 onMounted(async () => {
-  if (!isTauri() && localStorage.getItem('asv_pwa_unlocked') === 'true') {
-    isUnlocked.value = true;
-  }
-  await settingsStore.loadSettings();
+  try{await settingsStore.loadSettings();}catch(e){show('Ошибка загрузки настроек: '+String(e),'error');}
   await updateStats();
 });
 
@@ -58,34 +40,7 @@ watch(() => route.path, () => {
 </script>
 
 <template>
-  <!-- SECURITY LOCK SCREEN FOR WEB / PWA -->
-  <div v-if="!isUnlocked" class="pin-lock-screen">
-    <div class="glass-card lock-box p-8 text-center max-w-sm w-full mx-4">
-      <div class="lock-icon-wrapper mx-auto mb-4">
-        <Lock :size="32" color="#53f6e4" />
-      </div>
-      <h2 class="font-bold text-xl text-primary mb-1">ASV Production</h2>
-      <p class="text-xs text-muted mb-4">Приватный скаут клиентов. Введите PIN-код доступа:</p>
-
-      <div class="space-y-3">
-        <input 
-          v-model="inputPin" 
-          type="password" 
-          placeholder="Пин-код..." 
-          class="text-center font-bold text-lg p-3 glass-input w-full rounded-lg"
-          @keyup.enter="checkPin"
-        />
-        <div v-if="pinError" class="text-xs text-red-400 font-bold">{{ pinError }}</div>
-
-        <button class="btn btn-purple w-full flex items-center justify-center gap-2" @click="checkPin">
-          <KeyRound :size="18" />
-          <span>Войти в сервис</span>
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <div v-else class="layout">
+  <div class="layout">
     <!-- Desktop Sidebar -->
     <aside class="sidebar">
       <div class="sidebar-header">
@@ -103,17 +58,17 @@ watch(() => route.path, () => {
             <CheckCircle2 :size="12" /> {{ settingsStore.tokenUserName || 'Активен' }}
           </span>
           <span v-else-if="settingsStore.isTokenValid === false" class="flex items-center gap-1 text-amber-400 font-bold">
-            <AlertTriangle :size="12" /> Истек (Обновите)
+            <AlertTriangle :size="12" /> Ошибка проверки
           </span>
           <span v-else class="flex items-center gap-1 text-danger font-bold">
             <AlertCircle :size="12" /> Не указан
           </span>
         </div>
         <div class="token-hint text-xs text-muted">
-          {{ settingsStore.isTokenValid === true ? 'Прямой режим (без WebView)' : 'Авторизуйтесь в Настройках' }}
+          {{ settingsStore.isTokenValid === true ? 'Токен проверен; доступ методов проверяется при поиске' : 'Авторизуйтесь в Настройках' }}
         </div>
       </div>
-      
+
       <!-- Navigation Links -->
       <nav class="sidebar-nav">
         <router-link
@@ -127,21 +82,22 @@ watch(() => route.path, () => {
             <component :is="item.icon" :size="20" />
             <span>{{ item.name }}</span>
           </div>
-          
+
           <span v-if="item.path === '/crm' && artistCount > 0" class="nav-badge">
             {{ artistCount }}
           </span>
         </router-link>
       </nav>
-      
+
       <div class="sidebar-footer">
-        <div class="app-version text-xs text-muted">AI Music Scout v2.0 (ASV Production)</div>
+        <div class="app-version text-xs text-muted">ASV Scout 3.0 (ASV Production)</div>
         <div class="text-xs text-muted">Direct VK API • SQLite</div>
       </div>
     </aside>
 
     <!-- Main Workspace -->
     <main class="main-content">
+      <div class="mobile-brand" aria-label="ASV Production"><span class="mobile-brand-asv">ASV</span><span class="mobile-brand-production">PRODUCTION</span></div>
       <router-view v-slot="{ Component }">
         <transition name="fade" mode="out-in">
           <component :is="Component" />
@@ -189,8 +145,8 @@ watch(() => route.path, () => {
 }
 
 .lock-box {
-  background: rgba(18, 14, 38, 0.9);
-  border: 1px solid rgba(157, 78, 221, 0.4);
+  background: rgba(19, 27, 28, 0.9);
+  border: 1px solid rgba(46, 196, 182, 0.4);
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.8);
 }
 
@@ -198,8 +154,8 @@ watch(() => route.path, () => {
   width: 64px;
   height: 64px;
   border-radius: 50%;
-  background: rgba(83, 246, 228, 0.15);
-  border: 1px solid rgba(83, 246, 228, 0.4);
+  background: rgba(46, 196, 182, 0.15);
+  border: 1px solid rgba(46, 196, 182, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -222,11 +178,11 @@ watch(() => route.path, () => {
 .asv-dune-title {
   font-family: 'Dune Rise', sans-serif;
   font-size: 2.8rem;
-  color: #53f6e4;
+  color: #2EC4B6;
   line-height: 1;
   letter-spacing: 0.22em;
   text-indent: 0.22em;
-  text-shadow: 0 0 16px rgba(83, 246, 228, 0.65), 0 0 32px rgba(83, 246, 228, 0.35);
+  text-shadow: 0 0 16px rgba(46, 196, 182, 0.65), 0 0 32px rgba(46, 196, 182, 0.35);
   margin-bottom: 2px;
 }
 
@@ -241,7 +197,7 @@ watch(() => route.path, () => {
 }
 
 .token-status-card {
-  background: rgba(15, 12, 28, 0.6);
+  background: rgba(14, 23, 24, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.06);
   padding: 10px 14px;
   border-radius: var(--radius-sm);
@@ -278,13 +234,13 @@ watch(() => route.path, () => {
 }
 
 .nav-link.active {
-  background: rgba(98, 225, 216, 0.12);
+  background: rgba(46, 196, 182, 0.12);
   color: var(--primary);
   border-left: 3px solid var(--primary);
 }
 
 .nav-badge {
-  background: rgba(98, 225, 216, 0.2);
+  background: rgba(46, 196, 182, 0.2);
   color: var(--primary);
   padding: 2px 8px;
   border-radius: 12px;
@@ -299,14 +255,14 @@ watch(() => route.path, () => {
   text-align: center;
 }
 
-.mobile-bottom-nav {
-  display: none;
-}
+.mobile-brand { display: none; }
+.mobile-bottom-nav { display: none; }
 
 @media (max-width: 768px) {
-  .sidebar {
-    display: none;
-  }
+  .sidebar { display: none; }
+  .mobile-brand { display: flex; align-items: baseline; gap: 12px; padding-bottom: 18px; margin-bottom: 22px; border-bottom: 1px solid rgba(46,196,182,.2); }
+  .mobile-brand-asv { font-family: 'Dune Rise', sans-serif; color: var(--primary); font-size: 1.55rem; letter-spacing: .16em; text-shadow: 0 0 14px rgba(46,196,182,.35); }
+  .mobile-brand-production { font-family: 'Syncopate', sans-serif; color: #eaf7f5; font-size: .52rem; letter-spacing: .12em; }
 
   .mobile-bottom-nav {
     display: flex;
@@ -314,9 +270,9 @@ watch(() => route.path, () => {
     bottom: 0;
     left: 0;
     right: 0;
-    background: rgba(18, 14, 38, 0.95);
+    background: rgba(19, 27, 28, 0.95);
     backdrop-filter: blur(16px);
-    border-top: 1px solid rgba(157, 78, 221, 0.3);
+    border-top: 1px solid rgba(46, 196, 182, 0.3);
     padding: 10px 16px;
     padding-bottom: calc(10px + env(safe-area-inset-bottom));
     justify-content: space-around;

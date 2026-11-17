@@ -16,12 +16,18 @@ pub fn db_save_artist(
         artist.id = Uuid::new_v4().to_string();
     }
 
+    if let Ok(existing) = conn.query_row("SELECT id FROM artists WHERE vk_id=?1", [&artist.vk_id], |r|r.get::<_,String>(0)) { artist.id=existing; }
     conn.execute(
-        "INSERT OR REPLACE INTO artists
+        "INSERT INTO artists
             (id, vk_id, name, link, description, followers, last_activity,
              music_links, contacts, avatar, raw_data, status, notes, updated_at)
          VALUES
-            (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, CURRENT_TIMESTAMP)",
+            (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, CURRENT_TIMESTAMP)
+         ON CONFLICT(vk_id) DO UPDATE SET
+           name=excluded.name,link=excluded.link,description=excluded.description,
+           followers=excluded.followers,last_activity=excluded.last_activity,music_links=excluded.music_links,
+           contacts=excluded.contacts,avatar=excluded.avatar,raw_data=excluded.raw_data,
+           status=excluded.status,notes=excluded.notes,updated_at=CURRENT_TIMESTAMP",
         rusqlite::params![
             &artist.id,
             &artist.vk_id,
@@ -240,6 +246,7 @@ pub fn db_set_setting(
     key: String,
     value: String,
 ) -> Result<(), String> {
+    if key.contains("token") || key.contains("api_key") { return Err("Секреты хранятся только в памяти сессии".into()); }
     let conn = state.db.lock().map_err(|e| e.to_string())?;
     conn.execute(
         "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
@@ -297,4 +304,11 @@ pub fn db_get_stats(state: tauri::State<AppState>) -> Result<serde_json::Value, 
         "total": total,
         "by_status": status_map
     }))
+}
+
+#[tauri::command]
+pub fn db_delete_setting(state:tauri::State<AppState>,key:String)->Result<(),String>{
+    let db=state.db.lock().map_err(|_|"База недоступна".to_string())?;
+    db.execute("DELETE FROM settings WHERE key=?1",[key]).map_err(|_|"Не удалось очистить настройку".to_string())?;
+    Ok(())
 }

@@ -2,8 +2,8 @@ mod models;
 mod db;
 mod commands_db;
 mod commands_vk;
-mod ai;
-mod ai_scout;
+mod scout_db;
+mod scout_vk;
 use models::AppState;
 use std::sync::Mutex;
 use tauri::Manager;
@@ -29,7 +29,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             // VK
-            commands_vk::open_url,
+            scout_vk::open_url,
             commands_vk::vk_test_token,
             commands_vk::vk_search,
             commands_vk::vk_get_group,
@@ -37,16 +37,14 @@ pub fn run() {
             commands_vk::vk_get_wall,
             commands_vk::vk_get_members,
             commands_vk::vk_newsfeed_search,
-            // AI v1
-            ai::ai_analyze,
-            ai::ai_evaluate,
-            ai::ai_offer,
-            ai::ai_batch_score,
-            // AI Scout v2
-            ai_scout::ai_build_search_strategy,
-            ai_scout::vk_multi_vector_search,
-            ai_scout::ai_profile_candidate_v2,
-            ai_scout::ai_generate_team_message,
+            scout_vk::vk_search_v3,
+            scout_vk::vk_get_wall_v3,
+            scout_vk::vk_newsfeed_search_v3,
+            scout_vk::scout_test_token,
+            scout_vk::scout_get_owner,
+            scout_db::scout_get_records,
+            scout_db::scout_get_snapshot,
+            scout_db::scout_save_records,
             // DB - Artists
             commands_db::db_save_artist,
             commands_db::db_get_artists,
@@ -60,6 +58,7 @@ pub fn run() {
             // DB - Settings
             commands_db::db_set_setting,
             commands_db::db_get_setting,
+            commands_db::db_delete_setting,
             commands_db::db_get_stats,
         ])
         .run(tauri::generate_context!())
