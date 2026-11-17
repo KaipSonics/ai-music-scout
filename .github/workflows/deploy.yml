@@ -37,6 +37,19 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Checkout original Scout for comparison
+        uses: actions/checkout@v4
+        with:
+          ref: 700cad8709b76f07414048fce1b0c869f207d4ea
+          path: .v2-comparison
+
+      - name: Build isolated comparison
+        run: |
+          node scripts/prepare-v2-comparison.mjs .v2-comparison
+          ln -s "$GITHUB_WORKSPACE/node_modules" .v2-comparison/node_modules
+          ./node_modules/.bin/vite build .v2-comparison --base /ai-music-scout/v2-test/
+          cp -R .v2-comparison/dist dist/v2-test
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
 
