@@ -222,7 +222,7 @@ watch(() => route.path, () => {
   color: var(--text-secondary);
   text-decoration: none;
   font-weight: 600;
-  font-family: 'Rajdhani', sans-serif;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 1.1rem;
   transition: all 0.2s ease;
   text-transform: uppercase;
