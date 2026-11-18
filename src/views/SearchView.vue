@@ -12,7 +12,7 @@ const existingVkIds=ref(new Map<string,string>()),saving=ref(new Set<string>());
 const showMessageModal=ref(false),selectedItemForMsg=ref<{name:string}|null>(null),activeTabMsg=ref<'friendly'|'pro'|'direct'>('friendly');
 const generatedVariants=ref({friendly:'',pro:'',direct:''});const expanded=ref(new Set<string>());
 async function openExternal(url:string){try{await openLink(url);}catch(e){toast.show(String(e),'error');}}
-async function loadExisting(){try{existingVkIds.value=new Map((await allArtists()).map(a=>[identity(a)||a.id,a.id]));}catch(e){toast.show(String(e),'error');}}onMounted(loadExisting);
+async function loadExisting(){try{existingVkIds.value=new Map((await allArtists()).map(a=>[identity(a)||a.id,a.id]));}catch(e){toast.show(String(e),'error');}}onMounted(()=>{loadExisting();if(searchStore.state==='idle'&&!searchStore.demo&&!searchStore.results.length)searchStore.showDemo();});
 async function startClientSearch(){await searchStore.start();await loadExisting();}
 function toggleEvidence(id:string){const next=new Set(expanded.value);if(next.has(id))next.delete(id);else next.add(id);expanded.value=next;}
 function generateMessageForArtist(item:{name:string;opportunity:Opportunity}){
@@ -30,16 +30,17 @@ function openExisting(id:string){router.push('/artist/'+encodeURIComponent(id));
 <template>
   <div class="scout-v2-page">
     <div class="page-header mb-4">
-      <h1>AI Music Scout — Поиск Клиентов ASV Production</h1>
-      <p class="text-sm text-muted">Hot / Growth: проверяемые музыкальные проекты и реальные коммерческие потребности.</p>
+      <span class="scout-eyebrow">ASV PRODUCTION · ДЕМОНСТРАЦИЯ</span>
+      <h1>Поиск клиентов<br>для музыкальных проектов</h1>
+      <p class="text-sm text-muted">Scout помогает находить возможности для сотрудничества и вести работу с артистами.</p>
     </div>
 
     <!-- ONE CLICK SEARCH BOX -->
     <div class="glass-card mb-4 scout-input-card">
       <div class="flex items-center justify-between">
         <div>
-          <h3 class="font-bold text-primary mb-1">Найти клиентов для ASV Production</h3>
-          <p class="text-xs text-muted">Поиск оригинальных публикаций, проверка профилей и потребностей. Сохраняйте выбранных артистов в CRM.</p>
+          <h3 class="font-bold text-primary mb-1">Музыкальные проекты и коммерческие сигналы</h3>
+          <p class="text-sm text-muted">Изучайте примеры возможностей, источники и подготовку персонального обращения.</p>
         </div>
 
         <button
@@ -48,7 +49,7 @@ function openExisting(id:string){router.push('/artist/'+encodeURIComponent(id));
           :disabled="searchStore.isSearching"
         >
           <Sparkles :size="20" />
-          <span>{{ searchStore.isSearching ? 'Поиск выполняется...' : '🚀 Найти клиентов' }}</span>
+          <span>{{ searchStore.isSearching ? 'Поиск выполняется...' : 'Найти клиентов' }}</span>
         </button>
       </div>
     </div>
@@ -59,7 +60,7 @@ function openExisting(id:string){router.push('/artist/'+encodeURIComponent(id));
       <button class="btn btn-secondary" :disabled="searchStore.isSearching" @click="searchStore.showDemo">{{searchStore.demo?'Закрыть демо':'Демо'}}</button>
       <button v-if="searchStore.isSearching" class="btn btn-danger" @click="searchStore.cancel">Отменить поиск</button>
     </div>
-    <div v-if="searchStore.demo" class="alert-box mb-4" role="status">ДЕМО: артисты и публикации вымышлены. Запись в CRM и внешние ссылки отключены.</div>
+    <div v-if="searchStore.demo" class="alert-box mb-4" role="status"><strong>Демонстрационный режим.</strong> Артисты и публикации вымышлены. Поиск VK сейчас не подключён; сохранение этих примеров и внешние ссылки отключены.</div>
     <div v-if="searchStore.state==='cancelled' || searchStore.state==='empty'" class="glass-card mb-4" role="status">{{searchStore.stepMessage}}</div>
     <details v-if="searchStore.report" class="glass-card mb-4"><summary>Диагностика поиска</summary><p class="text-sm">Публикаций: {{searchStore.report.postCount}} · Исключено: {{searchStore.report.rejected}} · Недостаточно данных: {{searchStore.report.unverified}}</p><p v-for="(failure,i) in searchStore.report.failures" :key="i" class="text-xs text-danger">{{failure}}</p></details>
     <!-- Interactive Stepper Progress Display -->
@@ -80,7 +81,7 @@ function openExisting(id:string){router.push('/artist/'+encodeURIComponent(id));
     <!-- Target Results Grid -->
     <div v-if="searchStore.filteredResults.length > 0" class="results-container mb-6">
       <div class="results-header mb-4 flex justify-between items-center">
-        <span class="text-sm text-muted">Подтверждённые возможности: <strong>{{ searchStore.filteredResults.length }}</strong></span>
+        <span class="text-sm text-muted">{{searchStore.demo ? 'Примеры возможностей' : 'Подтверждённые возможности'}}: <strong>{{ searchStore.filteredResults.length }}</strong></span>
       </div>
 
       <div class="results-list">
