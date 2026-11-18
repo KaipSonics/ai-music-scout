@@ -9,11 +9,12 @@ import {draftOutreach,SERVICE_LABEL,type Opportunity} from '../scout/opportunity
 import {Plus,User,ExternalLink,Check,ShieldAlert,Sparkles,Flame,Brain,CheckCircle2,Star,MessageSquare,Copy,Heart,Headphones,Send} from '@lucide/vue';
 const searchStore=useSearchStore(),toast=useToast(),router=useRouter();
 const existingVkIds=ref(new Map<string,string>()),saving=ref(new Set<string>());
+const resultsSection=ref<HTMLElement|null>(null);
 const showMessageModal=ref(false),selectedItemForMsg=ref<{name:string}|null>(null),activeTabMsg=ref<'friendly'|'pro'|'direct'>('friendly');
 const generatedVariants=ref({friendly:'',pro:'',direct:''});const expanded=ref(new Set<string>());
 async function openExternal(url:string){try{await openLink(url);}catch(e){toast.show(String(e),'error');}}
 async function loadExisting(){try{existingVkIds.value=new Map((await allArtists()).map(a=>[identity(a)||a.id,a.id]));}catch(e){toast.show(String(e),'error');}}onMounted(()=>{loadExisting();if(searchStore.state==='idle'&&!searchStore.demo&&!searchStore.results.length)searchStore.showDemo();});
-async function startClientSearch(){await searchStore.start();await loadExisting();}
+async function startClientSearch(){if(searchStore.demo){resultsSection.value?.scrollIntoView({behavior:'smooth',block:'start'});return;}await searchStore.start();await loadExisting();}
 function toggleEvidence(id:string){const next=new Set(expanded.value);if(next.has(id))next.delete(id);else next.add(id);expanded.value=next;}
 function generateMessageForArtist(item:{name:string;opportunity:Opportunity}){
  selectedItemForMsg.value=item;const draft=draftOutreach(item.opportunity);
@@ -49,7 +50,7 @@ function openExisting(id:string){router.push('/artist/'+encodeURIComponent(id));
           :disabled="searchStore.isSearching"
         >
           <Sparkles :size="20" />
-          <span>{{ searchStore.isSearching ? 'Поиск выполняется...' : 'Найти клиентов' }}</span>
+          <span>{{ searchStore.isSearching ? 'Поиск выполняется...' : searchStore.demo ? 'Смотреть примеры' : 'Найти клиентов' }}</span>
         </button>
       </div>
     </div>
@@ -79,7 +80,7 @@ function openExisting(id:string){router.push('/artist/'+encodeURIComponent(id));
     </div>
 
     <!-- Target Results Grid -->
-    <div v-if="searchStore.filteredResults.length > 0" class="results-container mb-6">
+    <div v-if="searchStore.filteredResults.length > 0" ref="resultsSection" class="results-container mb-6">
       <div class="results-header mb-4 flex justify-between items-center">
         <span class="text-sm text-muted">{{searchStore.demo ? 'Примеры возможностей' : 'Подтверждённые возможности'}}: <strong>{{ searchStore.filteredResults.length }}</strong></span>
       </div>
